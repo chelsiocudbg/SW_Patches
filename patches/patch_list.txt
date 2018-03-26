@@ -93,6 +93,7 @@
 0092-cxgb4-collect-TX-rate-limit-info-in-UP-CIM-logs.patch		be6e36d916b1f7e6b0aec42d49cb5d5ea9590dff
 0093-iw_cxgb4-Guard-against-null-cm_id-in-dump_ep-qp.patch 		bab572f1d42dc79d366095fe939f012c59f603f4
 0094-cxgb4-notify-fatal-error-to-uld-drivers.patch			8b7372c101a5f9f38a092ab2533a75fc85c6e52a
+0095-iw_cxgb4-Add-ib_device-get_netdev-support.patch			f215a3d2448ae77253f0b93dcc37114779f51778
 
 0001-cxgb4-add-cudbg-support.patch					Not available in upstream.
 0002-cxgb4-collect-cudbg-debug-logs-during-kernel-crash.patch		Not available in upstream.
