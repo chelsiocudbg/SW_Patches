@@ -104,6 +104,7 @@
 0103-cxgb4-use-backdoor-access-to-collect-dumps-when-firm.patch		770ca3477a5bafe4422ead691500d2d99836dc1d
 0104-cxgb4-rework-on-chip-memory-read.patch				1a4330cdbf2270abcc0703837ef73148d0a75ccc
 0105-cxgb4-speed-up-on-chip-memory-read.patch				7494f980ca0503e3eec6f4ba508186d269b37e7f
+0106-cxgb4-fix-trailing-zero-in-CIM-LA-dump.patch			e6f02a4d57cc438099bc8abfba43ba1400d77b38
 
 0001-cxgb4-add-cudbg-support.patch					Not available in upstream.
 0002-cxgb4-collect-cudbg-debug-logs-during-kernel-crash.patch		Not available in upstream.
