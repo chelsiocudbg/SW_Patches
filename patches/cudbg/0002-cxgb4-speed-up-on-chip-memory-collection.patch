@@ -1,0 +1,145 @@
+From e7280f92234ed44bb4da34fa8a65c131fb7b4262 Mon Sep 17 00:00:00 2001
+From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date: Mon, 2 Apr 2018 17:33:13 +0530
+Subject: [PATCH 2/2] cxgb4: speed up on-chip memory collection
+
+Use GCC CPU intrinsic to do 256-bit reads instead of 32-bit reads
+when reading on-chip memory.
+
+Signed-off-by: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c   | 21 +++++++----
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h | 46 ++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c b/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
+index d68209a8..179c45ce 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
+@@ -24,6 +24,7 @@
+ #include "cudbg_entity.h"
+ #include "cudbg_lib.h"
+ #include "cudbg_zlib.h"
++#include "cxgb4_cudbg.h"
+ 
+ static int cudbg_do_compression(struct cudbg_init *pdbg_init,
+ 				struct cudbg_buffer *pin_buff,
+@@ -885,7 +886,7 @@ static int cudbg_memory_read(struct cudbg_init *pdbg_init, int win,
+ 	struct adapter *adap = pdbg_init->adap;
+ 	u32 pos, offset, resid;
+ 	u32 *res_buf;
+-	u64 *buf;
++	u256 *buf;
+ 	int ret;
+ 
+ 	/* Argument sanity checks ...
+@@ -893,10 +894,10 @@ static int cudbg_memory_read(struct cudbg_init *pdbg_init, int win,
+ 	if (addr & 0x3 || (uintptr_t)hbuf & 0x3)
+ 		return -EINVAL;
+ 
+-	buf = (u64 *)hbuf;
++	buf = (u256 *)hbuf;
+ 
+ 	/* Try to do 64-bit reads.  Residual will be handled later. */
+-	resid = len & 0x7;
++	resid = len & 0x1f;
+ 	len -= resid;
+ 
+ 	ret = t4_memory_rw_init(adap, win, mtype, &memoffset, &mem_base,
+@@ -915,12 +916,15 @@ static int cudbg_memory_read(struct cudbg_init *pdbg_init, int win,
+ 	 */
+ 	t4_memory_update_win(adap, win, pos | win_pf);
+ 
++	if (cxgb4_has_avx())
++		kernel_fpu_begin();
++
+ 	/* Transfer data from the adapter */
+ 	while (len > 0) {
+-		*buf++ = le64_to_cpu((__force __le64)
+-				     t4_read_reg64(adap, mem_base + offset));
+-		offset += sizeof(u64);
+-		len -= sizeof(u64);
++		*buf++ = le256_to_cpu((__force __le256)
++				      readqq(adap->regs + mem_base + offset));
++		offset += sizeof(u256);
++		len -= sizeof(u256);
+ 
+ 		/* If we've reached the end of our current window aperture,
+ 		 * move the PCI-E Memory Window on to the next.
+@@ -932,6 +936,9 @@ static int cudbg_memory_read(struct cudbg_init *pdbg_init, int win,
+ 		}
+ 	}
+ 
++	if (cxgb4_has_avx())
++		kernel_fpu_end();
++
+ 	res_buf = (u32 *)buf;
+ 	/* Read residual in 32-bit multiples */
+ 	while (resid > sizeof(u32)) {
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h
+index 66d4252f..962c7ec7 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h
+@@ -18,6 +18,9 @@
+ #ifndef __CXGB4_CUDBG_H__
+ #define __CXGB4_CUDBG_H__
+ 
++#include <asm/cpufeature.h>
++#include <asm/i387.h>
++
+ #include "cudbg_if.h"
+ #include "cudbg_lib_common.h"
+ #include "cudbg_entity.h"
+@@ -41,6 +44,49 @@ enum CXGB4_ETHTOOL_DUMP_FLAGS {
+ 	CXGB4_ETH_DUMP_HW = (1 << 1), /* various FW and HW dumps */
+ };
+ 
++typedef struct {
++	u64 a, b, c, d;
++} __u256;
++typedef __u256 u256, __le256;
++
++static inline int cxgb4_has_avx(void)
++{
++	return boot_cpu_has(X86_FEATURE_AVX);
++}
++
++static inline u256 readqq(const volatile void __iomem *addr)
++{
++	u256 ret;
++
++	if (!cxgb4_has_avx()) {
++		const volatile u64 __iomem *p = addr;
++
++		ret.a = readq(p);
++		ret.b = readq(p + 1);
++		ret.c = readq(p + 2);
++		ret.d = readq(p + 3);
++
++		return ret;
++	}
++
++	asm volatile("vmovdqu %0, %%ymm0" :
++		     : "m" (*(volatile u256 __force *)addr));
++	asm volatile("vmovdqu %%ymm0, %0" : "=m" (ret) : : "memory");
++	return ret;
++}
++
++static inline u256 le256_to_cpu(__le256 val)
++{
++	u256 ret;
++
++	ret.a = le64_to_cpu(val.a);
++	ret.b = le64_to_cpu(val.b);
++	ret.c = le64_to_cpu(val.c);
++	ret.d = le64_to_cpu(val.d);
++
++	return ret;
++}
++
+ #define CXGB4_ETH_DUMP_ALL (CXGB4_ETH_DUMP_MEM | CXGB4_ETH_DUMP_HW)
+ 
+ u32 cxgb4_get_dump_length(struct adapter *adap, u32 flag);
+-- 
+2.14.1
+
