@@ -98,6 +98,7 @@
 0097-cxgb4-update-dump-collection-logic-to-use-compressio.patch		56cf2635ce30febd448dc78ff5361e4d9ad2fc0e
 0098-cxgb4-use-zlib-deflate-to-compress-firmware-dump.patch		91c1953de38725d41cf9a677569a8cc280065064
 0099-cxgb4-enable-ZLIB_DEFLATE-when-building-cxgb4.patch		a1cf9c9ffe652a4f109eb2cd8e69d8fcdb855d00
+0100-cxgb4-properly-initialize-variables.patch				325694e6c3484959d066d5c0e9bff4c5966491a3
 
 0001-cxgb4-add-cudbg-support.patch					Not available in upstream.
 0002-cxgb4-collect-cudbg-debug-logs-during-kernel-crash.patch		Not available in upstream.
