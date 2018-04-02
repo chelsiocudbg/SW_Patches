@@ -1,0 +1,40 @@
+From 43eea151336a86dec0d798093c1b02459f8935b4 Mon Sep 17 00:00:00 2001
+From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date: Mon, 2 Apr 2018 17:28:32 +0530
+Subject: [PATCH 101/106] cxgb4: reset FW_OK flag on firmware crash
+
+commit 825b2b6fd949b0042f3793daafa59b742c9e9d7a
+Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date:   Fri Jan 26 17:05:54 2018 +0530
+
+    cxgb4: reset FW_OK flag on firmware crash
+
+    If firmware reports error, reset FW_OK flag.
+
+    Signed-off-by: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+    Signed-off-by: Ganesh Goudar <ganeshgr@chelsio.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/chelsio/cxgb4/t4_hw.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+index 57faa211..528498cb 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+@@ -196,9 +196,11 @@ static void t4_report_fw_error(struct adapter *adap)
+ 	u32 pcie_fw;
+ 
+ 	pcie_fw = t4_read_reg(adap, PCIE_FW_A);
+-	if (pcie_fw & PCIE_FW_ERR_F)
++	if (pcie_fw & PCIE_FW_ERR_F) {
+ 		dev_err(adap->pdev_dev, "Firmware reports adapter error: %s\n",
+ 			reason[PCIE_FW_EVAL_G(pcie_fw)]);
++		adap->flags &= ~FW_OK;
++	}
+ }
+ 
+ /*
+-- 
+2.14.1
+
