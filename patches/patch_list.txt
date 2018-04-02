@@ -96,6 +96,7 @@
 0095-iw_cxgb4-Add-ib_device-get_netdev-support.patch			f215a3d2448ae77253f0b93dcc37114779f51778
 0096-cxgb4-Add-support-for-ndo_get_vf_config.patch			661dbeb9d6e6e698d469c334527eae8177810b1f
 0097-cxgb4-update-dump-collection-logic-to-use-compressio.patch		56cf2635ce30febd448dc78ff5361e4d9ad2fc0e
+0098-cxgb4-use-zlib-deflate-to-compress-firmware-dump.patch		91c1953de38725d41cf9a677569a8cc280065064
 
 0001-cxgb4-add-cudbg-support.patch					Not available in upstream.
 0002-cxgb4-collect-cudbg-debug-logs-during-kernel-crash.patch		Not available in upstream.
