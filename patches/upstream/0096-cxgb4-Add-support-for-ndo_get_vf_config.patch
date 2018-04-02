@@ -1,0 +1,41 @@
+From 6f400b0d840b3ccfaeb7fe0936780963eebb4f22 Mon Sep 17 00:00:00 2001
+From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date: Mon, 2 Apr 2018 17:26:09 +0530
+Subject: [PATCH 096/106] cxgb4: Add support for ndo_get_vf_config
+
+Partial Backport:  Only pull the common code changes needed for
+vpd collection.
+
+commit 661dbeb9d6e6e698d469c334527eae8177810b1f
+Author: Hariprasad Shenai <hariprasad@chelsio.com>
+Date:   Fri Sep 2 19:13:53 2016 +0530
+
+    cxgb4: Add support for ndo_get_vf_config
+
+    Adds support for ndo_get_vf_config, also fill the default mac address
+    that will be provided to the VF by firmware, in case user doesn't
+    provide one. So user can get the default MAC address address also
+    through ndo_get_vf_config.
+
+    Signed-off-by: Hariprasad Shenai <hariprasad@chelsio.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/chelsio/cxgb4/t4_hw.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+index 4a611586..57faa211 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+@@ -2821,7 +2821,7 @@ int t4_get_raw_vpd_params(struct adapter *adapter, struct vpd_params *p)
+ 
+ out:
+ 	vfree(vpd);
+-	return ret;
++	return ret < 0 ? ret : 0;
+ }
+ 
+ /**
+-- 
+2.14.1
+
