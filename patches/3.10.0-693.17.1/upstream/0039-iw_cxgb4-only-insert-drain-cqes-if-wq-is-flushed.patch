@@ -1,0 +1,83 @@
+From f3d07ca8922a24a4875f6b7c8267cc23d276c436 Mon Sep 17 00:00:00 2001
+From: Potnuri Bharat Teja <bharat@chelsio.com>
+Date: Wed, 6 Dec 2017 12:33:45 +0530
+Subject: [PATCH 39/64] iw_cxgb4: only insert drain cqes if wq is flushed
+
+commit c058ecf6e455fac7346d46197a02398ead90851f
+Author: Steve Wise <swise@opengridcomputing.com>
+Date:   Mon Nov 27 13:16:32 2017 -0800
+
+    iw_cxgb4: only insert drain cqes if wq is flushed
+
+    Only insert our special drain CQEs to support ib_drain_sq/rq() after
+    the wq is flushed. Otherwise, existing but not yet polled CQEs can be
+    returned out of order to the user application.  This can happen when the
+    QP has exited RTS but not yet flushed the QP, which can happen during
+    a normal close (vs abortive close).
+
+    In addition never count the drain CQEs when determining how many CQEs
+    need to be synthesized during the flush operation.  This latter issue
+    should never happen if the QP is properly flushed before inserting the
+    drain CQE, but I wanted to avoid corrupting the CQ state.  So we handle
+    it and log a warning once.
+
+    Fixes: 4fe7c2962e11 ("iw_cxgb4: refactor sq/rq drain logic")
+    Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+    Cc: stable@vger.kernel.org
+    Signed-off-by: Jason Gunthorpe <jgg@mellanox.com>
+---
+ drivers/infiniband/hw/cxgb4/cq.c |  5 +++++
+ drivers/infiniband/hw/cxgb4/qp.c | 14 ++++++++++++--
+ 2 files changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/cq.c b/drivers/infiniband/hw/cxgb4/cq.c
+index 325991ff1951..a18f0578854a 100644
+--- a/drivers/infiniband/hw/cxgb4/cq.c
++++ b/drivers/infiniband/hw/cxgb4/cq.c
+@@ -397,6 +397,11 @@ next_cqe:
+ 
+ static int cqe_completes_wr(struct t4_cqe *cqe, struct t4_wq *wq)
+ {
++	if (CQE_OPCODE(cqe) == C4IW_DRAIN_OPCODE) {
++		WARN_ONCE(1, "Unexpected DRAIN CQE qp id %u!\n", wq->sq.qid);
++		return 0;
++	}
++
+ 	if (CQE_OPCODE(cqe) == FW_RI_TERMINATE)
+ 		return 0;
+ 
+diff --git a/drivers/infiniband/hw/cxgb4/qp.c b/drivers/infiniband/hw/cxgb4/qp.c
+index 934388af8303..236381b387bc 100644
+--- a/drivers/infiniband/hw/cxgb4/qp.c
++++ b/drivers/infiniband/hw/cxgb4/qp.c
+@@ -869,7 +869,12 @@ int c4iw_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
+ 
+ 	qhp = to_c4iw_qp(ibqp);
+ 	spin_lock_irqsave(&qhp->lock, flag);
+-	if (t4_wq_in_error(&qhp->wq)) {
++
++	/*
++	 * If the qp has been flushed, then just insert a special
++	 * drain cqe.
++	 */
++	if (qhp->wq.flushed) {
+ 		spin_unlock_irqrestore(&qhp->lock, flag);
+ 		complete_sq_drain_wr(qhp, wr);
+ 		return err;
+@@ -1012,7 +1017,12 @@ int c4iw_post_receive(struct ib_qp *ibqp, struct ib_recv_wr *wr,
+ 
+ 	qhp = to_c4iw_qp(ibqp);
+ 	spin_lock_irqsave(&qhp->lock, flag);
+-	if (t4_wq_in_error(&qhp->wq)) {
++
++	/*
++	 * If the qp has been flushed, then just insert a special
++	 * drain cqe.
++	 */
++	if (qhp->wq.flushed) {
+ 		spin_unlock_irqrestore(&qhp->lock, flag);
+ 		complete_rq_drain_wr(qhp, wr);
+ 		return err;
+-- 
+2.9.3
+

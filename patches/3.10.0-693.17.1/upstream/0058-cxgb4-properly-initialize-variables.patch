@@ -1,0 +1,75 @@
+From d2821c038c65e92297763d2e2a0ce320ffd53c7f Mon Sep 17 00:00:00 2001
+From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date: Mon, 2 Apr 2018 17:26:37 +0530
+Subject: [PATCH 58/64] cxgb4: properly initialize variables
+
+commit 325694e6c3484959d066d5c0e9bff4c5966491a3
+Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date:   Wed Jan 24 13:31:05 2018 +0530
+
+    cxgb4: properly initialize variables
+
+    memset variables to 0 to fix sparse warnings:
+
+    drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c:409:42: sparse: Using
+    plain integer as NULL pointer
+
+    drivers/net/ethernet/chelsio/cxgb4/cudbg_zlib.c:43:47: sparse: Using
+    plain integer as NULL pointer
+
+    Fixes: ad75b7d32f25 ("cxgb4: implement ethtool dump data operations")
+    Fixes: 91c1953de387 ("cxgb4: use zlib deflate to compress firmware dump")
+    Signed-off-by: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+    Signed-off-by: Ganesh Goudar <ganeshgr@chelsio.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cudbg_zlib.c  | 3 ++-
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c | 3 ++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cudbg_zlib.c b/drivers/net/ethernet/chelsio/cxgb4/cudbg_zlib.c
+index 4c3854cbeb6c..25cc06d75cff 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cudbg_zlib.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cudbg_zlib.c
+@@ -40,8 +40,8 @@ int cudbg_compress_buff(struct cudbg_init *pdbg_init,
+ 			struct cudbg_buffer *pin_buff,
+ 			struct cudbg_buffer *pout_buff)
+ {
+-	struct z_stream_s compress_stream = { 0 };
+ 	struct cudbg_buffer temp_buff = { 0 };
++	struct z_stream_s compress_stream;
+ 	struct cudbg_compress_hdr *c_hdr;
+ 	int rc;
+ 
+@@ -53,6 +53,7 @@ int cudbg_compress_buff(struct cudbg_init *pdbg_init,
+ 	c_hdr = (struct cudbg_compress_hdr *)temp_buff.data;
+ 	c_hdr->compress_id = CUDBG_ZLIB_COMPRESS_ID;
+ 
++	memset(&compress_stream, 0, sizeof(struct z_stream_s));
+ 	compress_stream.workspace = pdbg_init->workspace;
+ 	rc = zlib_deflateInit2(&compress_stream, Z_DEFAULT_COMPRESSION,
+ 			       Z_DEFLATED, CUDBG_ZLIB_WIN_BITS,
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c
+index 9e0a8a8186c4..30485f9a598f 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c
+@@ -406,14 +406,15 @@ static void cudbg_free_compress_buff(struct cudbg_init *pdbg_init)
+ int cxgb4_cudbg_collect(struct adapter *adap, void *buf, u32 *buf_size,
+ 			u32 flag)
+ {
+-	struct cudbg_init cudbg_init = { 0 };
+ 	struct cudbg_buffer dbg_buff = { 0 };
+ 	u32 size, min_size, total_size = 0;
++	struct cudbg_init cudbg_init;
+ 	struct cudbg_hdr *cudbg_hdr;
+ 	int rc;
+ 
+ 	size = *buf_size;
+ 
++	memset(&cudbg_init, 0, sizeof(struct cudbg_init));
+ 	cudbg_init.adap = adap;
+ 	cudbg_init.outbuf = buf;
+ 	cudbg_init.outbuf_size = size;
+-- 
+2.9.3
+

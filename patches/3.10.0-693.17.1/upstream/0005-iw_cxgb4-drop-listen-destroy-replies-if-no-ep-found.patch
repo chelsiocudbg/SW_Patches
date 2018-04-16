@@ -1,0 +1,44 @@
+From ff0d8102565bf2be6735a87e874a8e609028659e Mon Sep 17 00:00:00 2001
+From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date: Fri, 29 Sep 2017 12:08:42 +0530
+Subject: [PATCH 05/64] iw_cxgb4: drop listen destroy replies if no ep found
+
+commit 3c8415cc7aff467faba25841fb859660ac14a04e
+Author: Steve Wise <swise@opengridcomputing.com>
+Date:   Tue Sep 5 11:52:33 2017 -0700
+
+    iw_cxgb4: drop listen destroy replies if no ep found
+
+    If the thread waiting for a CLOSE_LISTSRV_RPL times out and bails,
+    then we need to handle a subsequent CPL if it arrives and the stid has
+    been released.  In this case silently drop it.
+
+    Cc: stable@vger.kernel.org
+    Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+    Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/cxgb4/cm.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
+index 6e141007dc5c..54d7e0647101 100644
+--- a/drivers/infiniband/hw/cxgb4/cm.c
++++ b/drivers/infiniband/hw/cxgb4/cm.c
+@@ -2319,9 +2319,14 @@ static int close_listsrv_rpl(struct c4iw_dev *dev, struct sk_buff *skb)
+ 	unsigned int stid = GET_TID(rpl);
+ 	struct c4iw_listen_ep *ep = get_ep_from_stid(dev, stid);
+ 
++	if (!ep) {
++		pr_debug("%s stid %d lookup failure!\n", __func__, stid);
++		goto out;
++	}
+ 	pr_debug("%s ep %p\n", __func__, ep);
+ 	c4iw_wake_up(&ep->com.wr_wait, status2errno(rpl->status));
+ 	c4iw_put_ep(&ep->com);
++out:
+ 	return 0;
+ }
+ 
+-- 
+2.9.3
+

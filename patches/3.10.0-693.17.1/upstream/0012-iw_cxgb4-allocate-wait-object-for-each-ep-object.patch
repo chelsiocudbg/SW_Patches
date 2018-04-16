@@ -1,0 +1,227 @@
+From c77e3ef2ac5829c1283fa080070f50f94e6400fd Mon Sep 17 00:00:00 2001
+From: Potnuri Bharat Teja <bharat@chelsio.com>
+Date: Fri, 6 Oct 2017 19:06:00 +0530
+Subject: [PATCH 12/64] iw_cxgb4: allocate wait object for each ep object
+
+commit ef885dc66c29dd8e6f6a12f164ed11237323c234
+Author: Steve Wise <swise@opengridcomputing.com>
+Date:   Tue Sep 26 13:12:16 2017 -0700
+
+    iw_cxgb4: allocate wait object for each ep object
+
+    Remove the embedded c4iw_wr_wait object in preparation for correctly
+    handling timeouts.
+
+    Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+    Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/cxgb4/cm.c       | 38 ++++++++++++++++++++--------------
+ drivers/infiniband/hw/cxgb4/iw_cxgb4.h |  2 +-
+ drivers/infiniband/hw/cxgb4/qp.c       |  8 +++----
+ 3 files changed, 28 insertions(+), 20 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
+index 1f46c3698962..8c8dc7abad82 100644
+--- a/drivers/infiniband/hw/cxgb4/cm.c
++++ b/drivers/infiniband/hw/cxgb4/cm.c
+@@ -318,11 +318,18 @@ static void *alloc_ep(int size, gfp_t gfp)
+ 
+ 	epc = kzalloc(size, gfp);
+ 	if (epc) {
++		epc->wr_waitp = kzalloc(sizeof(*epc->wr_waitp), gfp);
++		if (!epc->wr_waitp) {
++			kfree(epc);
++			epc = NULL;
++			goto out;
++		}
+ 		kref_init(&epc->kref);
+ 		mutex_init(&epc->mutex);
+-		c4iw_init_wr_wait(&epc->wr_wait);
++		c4iw_init_wr_wait(epc->wr_waitp);
+ 	}
+ 	pr_debug("alloc ep %p\n", epc);
++out:
+ 	return epc;
+ }
+ 
+@@ -406,6 +413,7 @@ void _c4iw_free_ep(struct kref *kref)
+ 	}
+ 	if (!skb_queue_empty(&ep->com.ep_skb_list))
+ 		skb_queue_purge(&ep->com.ep_skb_list);
++	kfree(ep->com.wr_waitp);
+ 	kfree(ep);
+ }
+ 
+@@ -1859,7 +1867,7 @@ static int abort_rpl(struct c4iw_dev *dev, struct sk_buff *skb)
+ 	mutex_lock(&ep->com.mutex);
+ 	switch (ep->com.state) {
+ 	case ABORTING:
+-		c4iw_wake_up(&ep->com.wr_wait, -ECONNRESET);
++		c4iw_wake_up(ep->com.wr_waitp, -ECONNRESET);
+ 		__state_set(&ep->com, DEAD);
+ 		release = 1;
+ 		break;
+@@ -2087,7 +2095,7 @@ static int c4iw_reconnect(struct c4iw_ep *ep)
+ 
+ 	pr_debug("qp %p cm_id %p\n", ep->com.qp, ep->com.cm_id);
+ 	init_timer(&ep->timer);
+-	c4iw_init_wr_wait(&ep->com.wr_wait);
++	c4iw_init_wr_wait(ep->com.wr_waitp);
+ 
+ 	/* When MPA revision is different on nodes, the node with MPA_rev=2
+ 	 * tries to reconnect with MPA_rev 1 for the same EP through
+@@ -2305,7 +2313,7 @@ static int pass_open_rpl(struct c4iw_dev *dev, struct sk_buff *skb)
+ 	}
+ 	pr_debug("ep %p status %d error %d\n", ep,
+ 		 rpl->status, status2errno(rpl->status));
+-	c4iw_wake_up(&ep->com.wr_wait, status2errno(rpl->status));
++	c4iw_wake_up(ep->com.wr_waitp, status2errno(rpl->status));
+ 	c4iw_put_ep(&ep->com);
+ out:
+ 	return 0;
+@@ -2322,7 +2330,7 @@ static int close_listsrv_rpl(struct c4iw_dev *dev, struct sk_buff *skb)
+ 		goto out;
+ 	}
+ 	pr_debug("ep %p\n", ep);
+-	c4iw_wake_up(&ep->com.wr_wait, status2errno(rpl->status));
++	c4iw_wake_up(ep->com.wr_waitp, status2errno(rpl->status));
+ 	c4iw_put_ep(&ep->com);
+ out:
+ 	return 0;
+@@ -2656,12 +2664,12 @@ static int peer_close(struct c4iw_dev *dev, struct sk_buff *skb)
+ 		 */
+ 		__state_set(&ep->com, CLOSING);
+ 		pr_debug("waking up ep %p tid %u\n", ep, ep->hwtid);
+-		c4iw_wake_up(&ep->com.wr_wait, -ECONNRESET);
++		c4iw_wake_up(ep->com.wr_waitp, -ECONNRESET);
+ 		break;
+ 	case MPA_REP_SENT:
+ 		__state_set(&ep->com, CLOSING);
+ 		pr_debug("waking up ep %p tid %u\n", ep, ep->hwtid);
+-		c4iw_wake_up(&ep->com.wr_wait, -ECONNRESET);
++		c4iw_wake_up(ep->com.wr_waitp, -ECONNRESET);
+ 		break;
+ 	case FPDU_MODE:
+ 		start_ep_timer(ep);
+@@ -2743,7 +2751,7 @@ static int peer_abort(struct c4iw_dev *dev, struct sk_buff *skb)
+ 	 * MPA_REQ_SENT
+ 	 */
+ 	if (ep->com.state != MPA_REQ_SENT)
+-		c4iw_wake_up(&ep->com.wr_wait, -ECONNRESET);
++		c4iw_wake_up(ep->com.wr_waitp, -ECONNRESET);
+ 
+ 	mutex_lock(&ep->com.mutex);
+ 	switch (ep->com.state) {
+@@ -3331,14 +3339,14 @@ static int create_server6(struct c4iw_dev *dev, struct c4iw_listen_ep *ep)
+ 		if (err)
+ 			return err;
+ 	}
+-	c4iw_init_wr_wait(&ep->com.wr_wait);
++	c4iw_init_wr_wait(ep->com.wr_waitp);
+ 	err = cxgb4_create_server6(ep->com.dev->rdev.lldi.ports[0],
+ 				   ep->stid, &sin6->sin6_addr,
+ 				   sin6->sin6_port,
+ 				   ep->com.dev->rdev.lldi.rxq_ids[0]);
+ 	if (!err)
+ 		err = c4iw_wait_for_reply(&ep->com.dev->rdev,
+-					  &ep->com.wr_wait,
++					  ep->com.wr_waitp,
+ 					  0, 0, __func__);
+ 	if (err) {
+ 		cxgb4_clip_release(ep->com.dev->rdev.lldi.ports[0],
+@@ -3372,13 +3380,13 @@ static int create_server4(struct c4iw_dev *dev, struct c4iw_listen_ep *ep)
+ 			}
+ 		} while (err == -EBUSY);
+ 	} else {
+-		c4iw_init_wr_wait(&ep->com.wr_wait);
++		c4iw_init_wr_wait(ep->com.wr_waitp);
+ 		err = cxgb4_create_server(ep->com.dev->rdev.lldi.ports[0],
+ 				ep->stid, sin->sin_addr.s_addr, sin->sin_port,
+ 				0, ep->com.dev->rdev.lldi.rxq_ids[0]);
+ 		if (!err)
+ 			err = c4iw_wait_for_reply(&ep->com.dev->rdev,
+-						  &ep->com.wr_wait,
++						  ep->com.wr_waitp,
+ 						  0, 0, __func__);
+ 	}
+ 	if (err)
+@@ -3468,13 +3476,13 @@ int c4iw_destroy_listen(struct iw_cm_id *cm_id)
+ 			ep->com.dev->rdev.lldi.rxq_ids[0], 0);
+ 	} else {
+ 		struct sockaddr_in6 *sin6;
+-		c4iw_init_wr_wait(&ep->com.wr_wait);
++		c4iw_init_wr_wait(ep->com.wr_waitp);
+ 		err = cxgb4_remove_server(
+ 				ep->com.dev->rdev.lldi.ports[0], ep->stid,
+ 				ep->com.dev->rdev.lldi.rxq_ids[0], 0);
+ 		if (err)
+ 			goto done;
+-		err = c4iw_wait_for_reply(&ep->com.dev->rdev, &ep->com.wr_wait,
++		err = c4iw_wait_for_reply(&ep->com.dev->rdev, ep->com.wr_waitp,
+ 					  0, 0, __func__);
+ 		sin6 = (struct sockaddr_in6 *)&ep->com.local_addr;
+ 		cxgb4_clip_release(ep->com.dev->rdev.lldi.ports[0],
+@@ -4195,7 +4203,7 @@ static int peer_abort_intr(struct c4iw_dev *dev, struct sk_buff *skb)
+ 	}
+ 	pr_debug("ep %p tid %u state %u\n", ep, ep->hwtid, ep->com.state);
+ 
+-	c4iw_wake_up(&ep->com.wr_wait, -ECONNRESET);
++	c4iw_wake_up(ep->com.wr_waitp, -ECONNRESET);
+ out:
+ 	sched(dev, skb);
+ 	return 0;
+diff --git a/drivers/infiniband/hw/cxgb4/iw_cxgb4.h b/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
+index d1fc96116abd..7f003d28e924 100644
+--- a/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
++++ b/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
+@@ -843,7 +843,7 @@ struct c4iw_ep_common {
+ 	struct mutex mutex;
+ 	struct sockaddr_storage local_addr;
+ 	struct sockaddr_storage remote_addr;
+-	struct c4iw_wr_wait wr_wait;
++	struct c4iw_wr_wait *wr_waitp;
+ 	unsigned long flags;
+ 	unsigned long history;
+ };
+diff --git a/drivers/infiniband/hw/cxgb4/qp.c b/drivers/infiniband/hw/cxgb4/qp.c
+index c3a02eacae3e..1cfbf2ee166f 100644
+--- a/drivers/infiniband/hw/cxgb4/qp.c
++++ b/drivers/infiniband/hw/cxgb4/qp.c
+@@ -1356,14 +1356,14 @@ static int rdma_fini(struct c4iw_dev *rhp, struct c4iw_qp *qhp,
+ 	wqe->flowid_len16 = cpu_to_be32(
+ 		FW_WR_FLOWID_V(ep->hwtid) |
+ 		FW_WR_LEN16_V(DIV_ROUND_UP(sizeof(*wqe), 16)));
+-	wqe->cookie = (uintptr_t)&ep->com.wr_wait;
++	wqe->cookie = (uintptr_t)ep->com.wr_waitp;
+ 
+ 	wqe->u.fini.type = FW_RI_TYPE_FINI;
+ 	ret = c4iw_ofld_send(&rhp->rdev, skb);
+ 	if (ret)
+ 		goto out;
+ 
+-	ret = c4iw_wait_for_reply(&rhp->rdev, &ep->com.wr_wait, qhp->ep->hwtid,
++	ret = c4iw_wait_for_reply(&rhp->rdev, ep->com.wr_waitp, qhp->ep->hwtid,
+ 			     qhp->wq.sq.qid, __func__);
+ out:
+ 	pr_debug("ret %d\n", ret);
+@@ -1426,7 +1426,7 @@ static int rdma_init(struct c4iw_dev *rhp, struct c4iw_qp *qhp)
+ 		FW_WR_FLOWID_V(qhp->ep->hwtid) |
+ 		FW_WR_LEN16_V(DIV_ROUND_UP(sizeof(*wqe), 16)));
+ 
+-	wqe->cookie = (uintptr_t)&qhp->ep->com.wr_wait;
++	wqe->cookie = (uintptr_t)qhp->ep->com.wr_waitp;
+ 
+ 	wqe->u.init.type = FW_RI_TYPE_INIT;
+ 	wqe->u.init.mpareqbit_p2ptype =
+@@ -1467,7 +1467,7 @@ static int rdma_init(struct c4iw_dev *rhp, struct c4iw_qp *qhp)
+ 	if (ret)
+ 		goto err1;
+ 
+-	ret = c4iw_wait_for_reply(&rhp->rdev, &qhp->ep->com.wr_wait,
++	ret = c4iw_wait_for_reply(&rhp->rdev, qhp->ep->com.wr_waitp,
+ 				  qhp->ep->hwtid, qhp->wq.sq.qid, __func__);
+ 	if (!ret)
+ 		goto out;
+-- 
+2.9.3
+

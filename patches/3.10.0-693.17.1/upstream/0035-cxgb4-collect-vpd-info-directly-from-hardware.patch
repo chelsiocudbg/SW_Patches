@@ -1,0 +1,257 @@
+From d4f2b536e1a0f883b98d899eaa1ccd6f5f95620f Mon Sep 17 00:00:00 2001
+From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date: Wed, 15 Nov 2017 19:49:32 +0530
+Subject: [PATCH 35/64] cxgb4: collect vpd info directly from hardware
+
+commit 940c9c458866725e0ade96d5c1c7dbe5fcf1cf85
+Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date:   Fri Nov 10 13:03:37 2017 +0530
+
+    cxgb4: collect vpd info directly from hardware
+
+    Collect vpd information directly from hardware instead of software
+    adapter context. Move EEPROM physical address to virtual address
+    translation logic to t4_hw.c and update relevant files.
+
+    Fixes: 6f92a6544f1a ("cxgb4: collect hardware misc dumps")
+    Signed-off-by: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+    Signed-off-by: Ganesh Goudar <ganeshgr@chelsio.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cudbg_entity.h  |  6 ++
+ drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c     | 77 ++++++++++++++++++----
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h         |  1 +
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c | 33 +---------
+ drivers/net/ethernet/chelsio/cxgb4/t4_hw.c         | 29 ++++++++
+ 5 files changed, 104 insertions(+), 42 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cudbg_entity.h b/drivers/net/ethernet/chelsio/cxgb4/cudbg_entity.h
+index 239c43084e77..1de1d811fde3 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cudbg_entity.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cudbg_entity.h
+@@ -166,6 +166,12 @@ struct cudbg_mps_tcam {
+ 	u8 reserved[2];
+ };
+ 
++#define CUDBG_VPD_PF_SIZE 0x800
++#define CUDBG_SCFG_VER_ADDR 0x06
++#define CUDBG_SCFG_VER_LEN 4
++#define CUDBG_VPD_VER_ADDR 0x18c7
++#define CUDBG_VPD_VER_LEN 2
++
+ struct cudbg_vpd_data {
+ 	u8 sn[SERNUM_LEN + 1];
+ 	u8 bn[PN_LEN + 1];
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c b/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
+index fe3a9ef0ec3f..32c9858da110 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
+@@ -68,6 +68,22 @@ struct cudbg_entity_hdr *cudbg_get_entity_hdr(void *outbuf, int i)
+ 		(sizeof(struct cudbg_entity_hdr) * (i - 1)));
+ }
+ 
++static int cudbg_read_vpd_reg(struct adapter *padap, u32 addr, u32 len,
++			      void *dest)
++{
++	int vaddr, rc;
++
++	vaddr = t4_eeprom_ptov(addr, padap->pf, EEPROMPFSIZE);
++	if (vaddr < 0)
++		return vaddr;
++
++	rc = pci_read_vpd(padap->pdev, vaddr, len, dest);
++	if (rc < 0)
++		return rc;
++
++	return 0;
++}
++
+ int cudbg_collect_reg_dump(struct cudbg_init *pdbg_init,
+ 			   struct cudbg_buffer *dbg_buff,
+ 			   struct cudbg_error *cudbg_err)
+@@ -1289,8 +1305,47 @@ int cudbg_collect_vpd_data(struct cudbg_init *pdbg_init,
+ {
+ 	struct adapter *padap = pdbg_init->adap;
+ 	struct cudbg_buffer temp_buff = { 0 };
++	char vpd_str[CUDBG_VPD_VER_LEN + 1];
++	u32 scfg_vers, vpd_vers, fw_vers;
+ 	struct cudbg_vpd_data *vpd_data;
+-	int rc;
++	struct vpd_params vpd = { 0 };
++	int rc, ret;
++
++	rc = t4_get_raw_vpd_params(padap, &vpd);
++	if (rc)
++		return rc;
++
++	rc = t4_get_fw_version(padap, &fw_vers);
++	if (rc)
++		return rc;
++
++	/* Serial Configuration Version is located beyond the PF's vpd size.
++	 * Temporarily give access to entire EEPROM to get it.
++	 */
++	rc = pci_set_vpd_size(padap->pdev, EEPROMVSIZE);
++	if (rc < 0)
++		return rc;
++
++	ret = cudbg_read_vpd_reg(padap, CUDBG_SCFG_VER_ADDR, CUDBG_SCFG_VER_LEN,
++				 &scfg_vers);
++
++	/* Restore back to original PF's vpd size */
++	rc = pci_set_vpd_size(padap->pdev, CUDBG_VPD_PF_SIZE);
++	if (rc < 0)
++		return rc;
++
++	if (ret)
++		return ret;
++
++	rc = cudbg_read_vpd_reg(padap, CUDBG_VPD_VER_ADDR, CUDBG_VPD_VER_LEN,
++				vpd_str);
++	if (rc)
++		return rc;
++
++	vpd_str[CUDBG_VPD_VER_LEN] = '\0';
++	rc = kstrtouint(vpd_str, 0, &vpd_vers);
++	if (rc)
++		return rc;
+ 
+ 	rc = cudbg_get_buff(dbg_buff, sizeof(struct cudbg_vpd_data),
+ 			    &temp_buff);
+@@ -1298,16 +1353,16 @@ int cudbg_collect_vpd_data(struct cudbg_init *pdbg_init,
+ 		return rc;
+ 
+ 	vpd_data = (struct cudbg_vpd_data *)temp_buff.data;
+-	memcpy(vpd_data->sn, padap->params.vpd.sn, SERNUM_LEN + 1);
+-	memcpy(vpd_data->bn, padap->params.vpd.pn, PN_LEN + 1);
+-	memcpy(vpd_data->na, padap->params.vpd.na, MACADDR_LEN + 1);
+-	memcpy(vpd_data->mn, padap->params.vpd.id, ID_LEN + 1);
+-	vpd_data->scfg_vers = padap->params.scfg_vers;
+-	vpd_data->vpd_vers = padap->params.vpd_vers;
+-	vpd_data->fw_major = FW_HDR_FW_VER_MAJOR_G(padap->params.fw_vers);
+-	vpd_data->fw_minor = FW_HDR_FW_VER_MINOR_G(padap->params.fw_vers);
+-	vpd_data->fw_micro = FW_HDR_FW_VER_MICRO_G(padap->params.fw_vers);
+-	vpd_data->fw_build = FW_HDR_FW_VER_BUILD_G(padap->params.fw_vers);
++	memcpy(vpd_data->sn, vpd.sn, SERNUM_LEN + 1);
++	memcpy(vpd_data->bn, vpd.pn, PN_LEN + 1);
++	memcpy(vpd_data->na, vpd.na, MACADDR_LEN + 1);
++	memcpy(vpd_data->mn, vpd.id, ID_LEN + 1);
++	vpd_data->scfg_vers = scfg_vers;
++	vpd_data->vpd_vers = vpd_vers;
++	vpd_data->fw_major = FW_HDR_FW_VER_MAJOR_G(fw_vers);
++	vpd_data->fw_minor = FW_HDR_FW_VER_MINOR_G(fw_vers);
++	vpd_data->fw_micro = FW_HDR_FW_VER_MICRO_G(fw_vers);
++	vpd_data->fw_build = FW_HDR_FW_VER_BUILD_G(fw_vers);
+ 	cudbg_write_and_release_buff(&temp_buff, dbg_buff);
+ 	return rc;
+ }
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+index e3578bc90cc5..0638ac8c4434 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+@@ -1484,6 +1484,7 @@ static inline int t4_memory_write(struct adapter *adap, int mtype, u32 addr,
+ unsigned int t4_get_regs_len(struct adapter *adapter);
+ void t4_get_regs(struct adapter *adap, void *buf, size_t buf_size);
+ 
++int t4_eeprom_ptov(unsigned int phys_addr, unsigned int fn, unsigned int sz);
+ int t4_seeprom_wp(struct adapter *adapter, bool enable);
+ int t4_get_raw_vpd_params(struct adapter *adapter, struct vpd_params *p);
+ int t4_get_vpd_params(struct adapter *adapter, struct vpd_params *p);
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c
+index fbd1c6cdffbf..d9c4306913fd 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c
+@@ -942,40 +942,11 @@ static int get_coalesce(struct net_device *dev, struct ethtool_coalesce *c)
+ 	return 0;
+ }
+ 
+-/**
+- *	eeprom_ptov - translate a physical EEPROM address to virtual
+- *	@phys_addr: the physical EEPROM address
+- *	@fn: the PCI function number
+- *	@sz: size of function-specific area
+- *
+- *	Translate a physical EEPROM address to virtual.  The first 1K is
+- *	accessed through virtual addresses starting at 31K, the rest is
+- *	accessed through virtual addresses starting at 0.
+- *
+- *	The mapping is as follows:
+- *	[0..1K) -> [31K..32K)
+- *	[1K..1K+A) -> [31K-A..31K)
+- *	[1K+A..ES) -> [0..ES-A-1K)
+- *
+- *	where A = @fn * @sz, and ES = EEPROM size.
+- */
+-static int eeprom_ptov(unsigned int phys_addr, unsigned int fn, unsigned int sz)
+-{
+-	fn *= sz;
+-	if (phys_addr < 1024)
+-		return phys_addr + (31 << 10);
+-	if (phys_addr < 1024 + fn)
+-		return 31744 - fn + phys_addr - 1024;
+-	if (phys_addr < EEPROMSIZE)
+-		return phys_addr - 1024 - fn;
+-	return -EINVAL;
+-}
+-
+ /* The next two routines implement eeprom read/write from physical addresses.
+  */
+ static int eeprom_rd_phys(struct adapter *adap, unsigned int phys_addr, u32 *v)
+ {
+-	int vaddr = eeprom_ptov(phys_addr, adap->pf, EEPROMPFSIZE);
++	int vaddr = t4_eeprom_ptov(phys_addr, adap->pf, EEPROMPFSIZE);
+ 
+ 	if (vaddr >= 0)
+ 		vaddr = pci_read_vpd(adap->pdev, vaddr, sizeof(u32), v);
+@@ -984,7 +955,7 @@ static int eeprom_rd_phys(struct adapter *adap, unsigned int phys_addr, u32 *v)
+ 
+ static int eeprom_wr_phys(struct adapter *adap, unsigned int phys_addr, u32 v)
+ {
+-	int vaddr = eeprom_ptov(phys_addr, adap->pf, EEPROMPFSIZE);
++	int vaddr = t4_eeprom_ptov(phys_addr, adap->pf, EEPROMPFSIZE);
+ 
+ 	if (vaddr >= 0)
+ 		vaddr = pci_write_vpd(adap->pdev, vaddr, sizeof(u32), &v);
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+index bab6571225e3..70abb24c3909 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+@@ -2663,6 +2663,35 @@ void t4_get_regs(struct adapter *adap, void *buf, size_t buf_size)
+ #define CHELSIO_VPD_UNIQUE_ID 0x82
+ 
+ /**
++ * t4_eeprom_ptov - translate a physical EEPROM address to virtual
++ * @phys_addr: the physical EEPROM address
++ * @fn: the PCI function number
++ * @sz: size of function-specific area
++ *
++ * Translate a physical EEPROM address to virtual.  The first 1K is
++ * accessed through virtual addresses starting at 31K, the rest is
++ * accessed through virtual addresses starting at 0.
++ *
++ * The mapping is as follows:
++ * [0..1K) -> [31K..32K)
++ * [1K..1K+A) -> [31K-A..31K)
++ * [1K+A..ES) -> [0..ES-A-1K)
++ *
++ * where A = @fn * @sz, and ES = EEPROM size.
++ */
++int t4_eeprom_ptov(unsigned int phys_addr, unsigned int fn, unsigned int sz)
++{
++	fn *= sz;
++	if (phys_addr < 1024)
++		return phys_addr + (31 << 10);
++	if (phys_addr < 1024 + fn)
++		return 31744 - fn + phys_addr - 1024;
++	if (phys_addr < EEPROMSIZE)
++		return phys_addr - 1024 - fn;
++	return -EINVAL;
++}
++
++/**
+  *	t4_seeprom_wp - enable/disable EEPROM write protection
+  *	@adapter: the adapter
+  *	@enable: whether to enable or disable write protection
+-- 
+2.9.3
+

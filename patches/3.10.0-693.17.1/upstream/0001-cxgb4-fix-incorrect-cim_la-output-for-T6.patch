@@ -1,0 +1,44 @@
+From 5e4d0281c220312b810bf86e7d6784c5b6434130 Mon Sep 17 00:00:00 2001
+From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date: Tue, 27 Jun 2017 17:37:21 +0530
+Subject: [PATCH 01/64] cxgb4: fix incorrect cim_la output for T6
+
+commit a97051f4553551d13e586ab3cb6ae13093a44a81
+Author: Ganesh Goudar <ganeshgr@chelsio.com>
+Date:   Wed May 31 19:10:21 2017 +0530
+
+    cxgb4: fix incorrect cim_la output for T6
+
+    take care of UpDbgLaRdPtr[0-3] restriction for T6.
+
+    Signed-off-by: Ganesh Goudar <ganeshgr@chelsio.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/chelsio/cxgb4/t4_hw.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+index fa678aab72ab..af05ff3bc994 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+@@ -8294,7 +8294,16 @@ int t4_cim_read_la(struct adapter *adap, u32 *la_buf, unsigned int *wrptr)
+ 		ret = t4_cim_read(adap, UP_UP_DBG_LA_DATA_A, 1, &la_buf[i]);
+ 		if (ret)
+ 			break;
+-		idx = (idx + 1) & UPDBGLARDPTR_M;
++
++		/* Bits 0-3 of UpDbgLaRdPtr can be between 0000 to 1001 to
++		 * identify the 32-bit portion of the full 312-bit data
++		 */
++		if (is_t6(adap->params.chip) && (idx & 0xf) >= 9)
++			idx = (idx & 0xff0) + 0x10;
++		else
++			idx++;
++		/* address can't exceed 0xfff */
++		idx &= UPDBGLARDPTR_M;
+ 	}
+ restart:
+ 	if (cfg & UPDBGLAEN_F) {
+-- 
+2.9.3
+

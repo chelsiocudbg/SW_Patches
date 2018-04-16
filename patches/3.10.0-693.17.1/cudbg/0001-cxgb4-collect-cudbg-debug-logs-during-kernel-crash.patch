@@ -1,0 +1,423 @@
+From 09eab8b50faeda540087cbf34e27297699655216 Mon Sep 17 00:00:00 2001
+From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date: Mon, 2 Apr 2018 17:33:04 +0530
+Subject: [PATCH 1/2] cxgb4: collect cudbg debug logs during kernel crash
+
+Register panic notifier to collect cudbg logs during kernel panic.
+
+Signed-off-by: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c   |   9 ++
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h       |   5 +
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c |  84 +++++++++++-
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h |   4 +
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c  |  15 +++
+ drivers/net/ethernet/chelsio/cxgb4/t4_hw.c       | 155 ++++++++++++++++++++++-
+ 6 files changed, 262 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c b/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
+index a945fa5f2312..d68209a82e62 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
+@@ -2209,6 +2209,14 @@ int cudbg_collect_vpd_data(struct cudbg_init *pdbg_init,
+ 	struct vpd_params vpd = { 0 };
+ 	int rc, ret;
+ 
++	if (padap->flags & K_CRASH) {
++		memcpy(&vpd, &padap->params.vpd, sizeof(struct vpd_params));
++		scfg_vers = padap->params.scfg_vers;
++		vpd_vers = padap->params.vpd_vers;
++		fw_vers = padap->params.fw_vers;
++		goto fill_vpd;
++	}
++
+ 	rc = t4_get_raw_vpd_params(padap, &vpd);
+ 	if (rc)
+ 		return rc;
+@@ -2245,6 +2253,7 @@ int cudbg_collect_vpd_data(struct cudbg_init *pdbg_init,
+ 	if (rc)
+ 		return rc;
+ 
++fill_vpd:
+ 	rc = cudbg_get_buff(pdbg_init, dbg_buff, sizeof(struct cudbg_vpd_data),
+ 			    &temp_buff);
+ 	if (rc)
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+index a4d6cf295eaa..00d42b6a7491 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+@@ -512,6 +512,7 @@ enum {                                 /* adapter flags */
+ 	USING_SOFT_PARAMS  = (1 << 6),
+ 	MASTER_PF          = (1 << 7),
+ 	FW_OFLD_CONN       = (1 << 9),
++	K_CRASH            = (1 << 12),
+ };
+ 
+ enum {
+@@ -877,6 +878,10 @@ struct adapter {
+ 	/* Ethtool Dump */
+ 	struct ethtool_dump eth_dump;
+ 
++	void *dump_buf; /* Dump buffer for collecting logs in panic */
++	u32 dump_buf_size; /* Dump buffer size */
++	struct notifier_block panic_nb; /* Panic notifier info */
++
+ 	/* TC u32 offload */
+ 	struct cxgb4_tc_u32_table *tc_u32;
+ };
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c
+index 143686c60234..3da26fc6b224 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c
+@@ -383,13 +383,25 @@ static void cxgb4_cudbg_collect_entity(struct cudbg_init *pdbg_init,
+ 
+ static int cudbg_alloc_compress_buff(struct cudbg_init *pdbg_init)
+ {
++	struct adapter *adap = pdbg_init->adap;
+ 	u32 workspace_size;
+ 
+ 	workspace_size = cudbg_get_workspace_size();
+-	pdbg_init->compress_buff = vzalloc(CUDBG_COMPRESS_BUFF_SIZE +
+-					   workspace_size);
+-	if (!pdbg_init->compress_buff)
+-		return -ENOMEM;
++
++	if (adap->flags & K_CRASH) {
++		/* In panic scenario, the compression buffer is already
++		 * allocated. So, just update accordingly.
++		 */
++		pdbg_init->compress_buff = (u8 *)adap->dump_buf +
++					   adap->dump_buf_size -
++					   workspace_size -
++					   CUDBG_COMPRESS_BUFF_SIZE;
++	} else {
++		pdbg_init->compress_buff = vzalloc(CUDBG_COMPRESS_BUFF_SIZE +
++						   workspace_size);
++		if (!pdbg_init->compress_buff)
++			return -ENOMEM;
++	}
+ 
+ 	pdbg_init->compress_buff_size = CUDBG_COMPRESS_BUFF_SIZE;
+ 	pdbg_init->workspace = (u8 *)pdbg_init->compress_buff +
+@@ -399,6 +411,14 @@ static int cudbg_alloc_compress_buff(struct cudbg_init *pdbg_init)
+ 
+ static void cudbg_free_compress_buff(struct cudbg_init *pdbg_init)
+ {
++	struct adapter *adap = pdbg_init->adap;
++
++	/* Don't free in panic scenario.  We need the buffer to be present
++	 * in vmcore so that we can extract the dump.
++	 */
++	if (adap->flags & K_CRASH)
++		return;
++
+ 	if (pdbg_init->compress_buff)
+ 		vfree(pdbg_init->compress_buff);
+ }
+@@ -488,3 +508,59 @@ void cxgb4_init_ethtool_dump(struct adapter *adapter)
+ 	adapter->eth_dump.version = adapter->params.fw_vers;
+ 	adapter->eth_dump.len = 0;
+ }
++
++static int cxgb4_panic_notify(struct notifier_block *this, unsigned long event,
++			      void *ptr)
++{
++	struct adapter *adap = container_of(this, struct adapter, panic_nb);
++	u32 len;
++
++	dev_info(adap->pdev_dev, "Initialized cxgb4 crash handler");
++	adap->flags |= K_CRASH;
++
++	len = adap->dump_buf_size;
++	cxgb4_cudbg_collect(adap, adap->dump_buf, &len, CXGB4_ETH_DUMP_ALL);
++	dev_info(adap->pdev_dev, "cxgb4 debug collection done...");
++
++	return NOTIFY_DONE;
++}
++
++int cxgb4_cudbg_register_notifier(struct adapter *adap)
++{
++	u32 wsize, len;
++
++	len = sizeof(struct cudbg_hdr) +
++	      sizeof(struct cudbg_entity_hdr) * CUDBG_MAX_ENTITY;
++	len += CUDBG_DUMP_BUFF_SIZE;
++
++	/* If compression is enabled, allocate extra memory needed for
++	 * compression too.
++	 */
++	wsize = cudbg_get_workspace_size();
++	if (wsize)
++		wsize += CUDBG_COMPRESS_BUFF_SIZE;
++
++	adap->dump_buf_size = len + wsize;
++	adap->dump_buf = vzalloc(adap->dump_buf_size);
++	if (!adap->dump_buf)
++		return -ENOMEM;
++
++	/* Print info so that we can extract firmware dump from vmcore */
++	dev_info(adap->pdev_dev,
++		 "Registering cxgb4 panic handler.., Buffer start address = %p, size: %u\n",
++		 adap->dump_buf, len);
++
++	adap->panic_nb.notifier_call = cxgb4_panic_notify;
++	adap->panic_nb.priority = INT_MAX;
++	atomic_notifier_chain_register(&panic_notifier_list, &adap->panic_nb);
++	return 0;
++}
++
++void cxgb4_cudbg_unregister_notifier(struct adapter *adap)
++{
++	if (adap->dump_buf) {
++		atomic_notifier_chain_unregister(&panic_notifier_list,
++						 &adap->panic_nb);
++		vfree(adap->dump_buf);
++	}
++}
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h
+index ce1ac9a1c878..66d4252f5032 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h
+@@ -41,8 +41,12 @@ enum CXGB4_ETHTOOL_DUMP_FLAGS {
+ 	CXGB4_ETH_DUMP_HW = (1 << 1), /* various FW and HW dumps */
+ };
+ 
++#define CXGB4_ETH_DUMP_ALL (CXGB4_ETH_DUMP_MEM | CXGB4_ETH_DUMP_HW)
++
+ u32 cxgb4_get_dump_length(struct adapter *adap, u32 flag);
+ int cxgb4_cudbg_collect(struct adapter *adap, void *buf, u32 *buf_size,
+ 			u32 flag);
+ void cxgb4_init_ethtool_dump(struct adapter *adapter);
++int cxgb4_cudbg_register_notifier(struct adapter *adap);
++void cxgb4_cudbg_unregister_notifier(struct adapter *adap);
+ #endif /* __CXGB4_CUDBG_H__ */
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index e087fe942543..65bf94d2aa69 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -4776,6 +4776,18 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 	}
+ 
+ 	setup_memwin(adapter);
++
++	/* Register panic notifier */
++	if (!is_kdump_kernel()) {
++		err = cxgb4_cudbg_register_notifier(adapter);
++		if (err) {
++			dev_warn(adapter->pdev_dev,
++				 "Fail registering panic notifier, err: %d. Continuing\n",
++				 err);
++			err = 0;
++		}
++	}
++
+ 	err = adap_init0(adapter);
+ #ifdef CONFIG_DEBUG_FS
+ 	bitmap_zero(adapter->sge.blocked_fl, adapter->sge.egr_sz);
+@@ -5050,6 +5062,7 @@ sriov:
+ 		destroy_workqueue(adapter->workq);
+ 
+ 	kfree(adapter->mbox_log);
++	cxgb4_cudbg_unregister_notifier(adapter);
+ 	kfree(adapter);
+  out_unmap_bar0:
+ 	iounmap(regs);
+@@ -5118,6 +5131,8 @@ static void remove_one(struct pci_dev *pdev)
+ 		pci_release_regions(pdev);
+ 		kfree(adapter->mbox_log);
+ 		synchronize_rcu();
++		/* Unregister panic notifier */
++		cxgb4_cudbg_unregister_notifier(adapter);
+ 		kfree(adapter);
+ 	}
+ #ifdef CONFIG_PCI_IOV
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+index 55cc4a6e8a9b..28d0f51116a5 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+@@ -257,6 +257,143 @@ static void t4_record_mbox(struct adapter *adapter,
+ 	entry->execute = execute;
+ }
+ 
++#define CIM_PF_NOACCESS 0xeeeeeeee
++/*
++ * The maximum number of times to iterate for FW reply before
++ * issuing a mailbox timeout
++ */
++#define FW_REPLY_WAIT_LOOP 6000000
++
++/**
++ *	t4_wr_mbox_meat_timeout_panic - send a command to FW through the given
++ *	mailbox. This function is a minimal version of t4_wr_mbox_meat_timeout()
++ *	and is only invoked during a kernel crash. Since this function is
++ *	called through a atomic notifier chain ,we cannot sleep awaiting a
++ *	response from FW, hence repeatedly loop until we get a reply.
++ *
++ *	@adap: the adapter
++ *	@mbox: index of the mailbox to use
++ *	@cmd: the command to write
++ *	@size: command length in bytes
++ *	@rpl: where to optionally store the reply
++ */
++
++static int t4_wr_mbox_meat_timeout_panic(struct adapter *adap, int mbox,
++			    const void *cmd, int size, void *rpl)
++{
++	u32 v;
++	u64 res;
++	int i, ret;
++	u64 cnt;
++	const __be64 *p = cmd;
++	u32 data_reg = PF_REG(mbox, CIM_PF_MAILBOX_DATA_A);
++	u32 ctl_reg = PF_REG(mbox, CIM_PF_MAILBOX_CTRL_A);
++	u32 ctl;
++	__be64 cmd_rpl[MBOX_LEN/8];
++	u32 pcie_fw;
++
++	if ((size & 15) || size > MBOX_LEN)
++		return -EINVAL;
++
++	/* Check for a firmware error which we'll report as a
++	 * device error.
++	 */
++	pcie_fw = t4_read_reg(adap, PCIE_FW_A);
++	if (pcie_fw & PCIE_FW_ERR_F) {
++		t4_report_fw_error(adap);
++		ret = (pcie_fw & PCIE_FW_ERR_F) ? -ENXIO : -EBUSY;
++		return ret;
++	}
++
++	/* Attempt to gain access to the mailbox.
++	 */
++	for (i = 0; i < 4; i++) {
++		ctl = t4_read_reg(adap, ctl_reg);
++		v = MBOWNER_G(ctl);
++		if (v != MBOX_OWNER_NONE)
++			break;
++	}
++
++	/* If we were unable to gain access, report the error to our caller.
++	 */
++	if (v != MBOX_OWNER_DRV) {
++		t4_report_fw_error(adap);
++		ret = (v == MBOX_OWNER_FW) ? -EBUSY : -ETIMEDOUT;
++		return ret;
++	}
++
++	/* If we gain ownership of the mailbox and there's a "valid" message
++	 * in it, this is likely an asynchronous error message from the
++	 * firmware.  So we'll report that and then proceed on with attempting
++	 * to issue our own command ... which may well fail if the error
++	 * presaged the firmware crashing ...
++	 */
++	if (ctl & MBMSGVALID_F) {
++		dev_err(adap->pdev_dev, "found VALID command in mbox %u: "
++		       "%llx %llx %llx %llx %llx %llx %llx %llx\n", mbox,
++		       (unsigned long long)t4_read_reg64(adap, data_reg),
++		       (unsigned long long)t4_read_reg64(adap, data_reg + 8),
++		       (unsigned long long)t4_read_reg64(adap, data_reg + 16),
++		       (unsigned long long)t4_read_reg64(adap, data_reg + 24),
++		       (unsigned long long)t4_read_reg64(adap, data_reg + 32),
++		       (unsigned long long)t4_read_reg64(adap, data_reg + 40),
++		       (unsigned long long)t4_read_reg64(adap, data_reg + 48),
++		       (unsigned long long)t4_read_reg64(adap, data_reg + 56));
++	}
++
++	/* Copy in the new mailbox command and send it on its way ...
++	 */
++	for (i = 0; i < size; i += 8, p++)
++		t4_write_reg64(adap, data_reg + i, be64_to_cpu(*p));
++
++
++	t4_write_reg(adap, ctl_reg, MBMSGVALID_F | MBOWNER_V(MBOX_OWNER_FW));
++	t4_read_reg(adap, ctl_reg);	/* flush write */
++
++	/* Loop waiting for the reply; bail out if we time out or the firmware
++	 * reports an error.
++	 */
++	for (cnt = 0;
++	    !((pcie_fw = t4_read_reg(adap, PCIE_FW_A)) & PCIE_FW_ERR_F) &&
++	    cnt < FW_REPLY_WAIT_LOOP;
++	    cnt++) {
++		v = t4_read_reg(adap, ctl_reg);
++		if (v == CIM_PF_NOACCESS)
++			continue;
++		if (MBOWNER_G(v) == MBOX_OWNER_DRV) {
++			if (!(v & MBMSGVALID_F)) {
++				t4_write_reg(adap, ctl_reg,
++					     MBOWNER_V(MBOX_OWNER_NONE));
++				continue;
++			}
++
++			/*
++			 * Retrieve the command reply and release the mailbox.
++			 */
++			get_mbox_rpl(adap, cmd_rpl, size/8, data_reg);
++			t4_write_reg(adap, ctl_reg, MBOWNER_V(MBOX_OWNER_NONE));
++
++			res = be64_to_cpu(cmd_rpl[0]);
++			if (FW_CMD_OP_G(res >> 32) == FW_DEBUG_CMD) {
++				res = FW_CMD_RETVAL_V(EIO);
++			} else if (rpl)
++				memcpy(rpl, cmd_rpl, size);
++			return -FW_CMD_RETVAL_G((int)res);
++		}
++	}
++
++	/* We timed out waiting for a reply to our mailbox command.  Report
++	 * the error and also check to see if the firmware reported any
++	 * errors ...
++	 */
++	ret = (pcie_fw & PCIE_FW_ERR_F) ? -ENXIO : -ETIMEDOUT;
++	dev_err(adap->pdev_dev, "command %#x in mailbox %d timed out\n",
++		*(const u8 *)cmd, mbox);
++
++	t4_report_fw_error(adap);
++	return ret;
++}
++
+ /**
+  *	t4_wr_mbox_meat_timeout - send a command to FW through the given mailbox
+  *	@adap: the adapter
+@@ -443,8 +580,12 @@ int t4_wr_mbox_meat_timeout(struct adapter *adap, int mbox, const void *cmd,
+ int t4_wr_mbox_meat(struct adapter *adap, int mbox, const void *cmd, int size,
+ 		    void *rpl, bool sleep_ok)
+ {
+-	return t4_wr_mbox_meat_timeout(adap, mbox, cmd, size, rpl, sleep_ok,
+-				       FW_CMD_MAX_TIMEOUT);
++	if (adap->flags & K_CRASH)
++		return t4_wr_mbox_meat_timeout_panic(adap, mbox, cmd, size,
++						     rpl);
++	else
++		return t4_wr_mbox_meat_timeout(adap, mbox, cmd, size, rpl,
++					       sleep_ok, FW_CMD_MAX_TIMEOUT);
+ }
+ 
+ static int t4_edc_err_read(struct adapter *adap, int idx)
+@@ -3007,8 +3148,12 @@ static int flash_wait_op(struct adapter *adapter, int attempts, int delay)
+ 			return 0;
+ 		if (--attempts == 0)
+ 			return -EAGAIN;
+-		if (delay)
+-			msleep(delay);
++		if (delay) {
++			if (adapter->flags & K_CRASH)
++				mdelay(delay);
++			else
++				msleep(delay);
++		}
+ 	}
+ }
+ 
+@@ -7871,8 +8016,6 @@ static void init_link_config(struct link_config *lc, unsigned int pcaps,
+ 	}
+ }
+ 
+-#define CIM_PF_NOACCESS 0xeeeeeeee
+-
+ int t4_wait_dev_ready(void __iomem *regs)
+ {
+ 	u32 whoami;
+-- 
+2.9.3
+
