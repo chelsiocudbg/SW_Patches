@@ -1,0 +1,51 @@
+From 7cd197788aed2f691ee346f5e9f1c3c3cf46a450 Mon Sep 17 00:00:00 2001
+From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date: Mon, 2 Apr 2018 17:28:45 +0530
+Subject: [PATCH 14/14] cxgb4: fix trailing zero in CIM LA dump
+
+commit e6f02a4d57cc438099bc8abfba43ba1400d77b38
+Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date:   Thu Feb 15 18:20:01 2018 +0530
+
+    cxgb4: fix trailing zero in CIM LA dump
+
+    Set correct size of the CIM LA dump for T6.
+
+    Fixes: 27887bc7cb7f ("cxgb4: collect hardware LA dumps")
+    Signed-off-by: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+    Signed-off-by: Ganesh Goudar <ganeshgr@chelsio.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c   | 2 +-
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c b/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
+index 3adc608d9eed..a945fa5f2312 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
+@@ -472,7 +472,7 @@ int cudbg_collect_cim_la(struct cudbg_init *pdbg_init,
+ 
+ 	if (is_t6(padap->params.chip)) {
+ 		size = padap->params.cim_la_size / 10 + 1;
+-		size *= 11 * sizeof(u32);
++		size *= 10 * sizeof(u32);
+ 	} else {
+ 		size = padap->params.cim_la_size / 8;
+ 		size *= 8 * sizeof(u32);
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c
+index 30485f9a598f..143686c60234 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c
+@@ -102,7 +102,7 @@ static u32 cxgb4_get_entity_length(struct adapter *adap, u32 entity)
+ 	case CUDBG_CIM_LA:
+ 		if (is_t6(adap->params.chip)) {
+ 			len = adap->params.cim_la_size / 10 + 1;
+-			len *= 11 * sizeof(u32);
++			len *= 10 * sizeof(u32);
+ 		} else {
+ 			len = adap->params.cim_la_size / 8;
+ 			len *= 8 * sizeof(u32);
+-- 
+2.9.3
+

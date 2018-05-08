@@ -1,0 +1,99 @@
+From cfeb4f784f986c6735a47f72835350373079e8d1 Mon Sep 17 00:00:00 2001
+From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date: Sat, 17 Mar 2018 14:29:17 +0530
+Subject: [PATCH 03/14] cxgb4: notify fatal error to uld drivers
+
+commit 8b7372c101a5f9f38a092ab2533a75fc85c6e52a
+Author: Ganesh Goudar <ganeshgr@chelsio.com>
+Date:   Fri Mar 16 14:22:57 2018 +0530
+
+    cxgb4: notify fatal error to uld drivers
+
+    notify uld drivers if the adapter encounters fatal
+    error.
+
+    Signed-off-by: Ganesh Goudar <ganeshgr@chelsio.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/infiniband/hw/cxgb4/device.c            |  1 +
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |  1 +
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 10 ++++++++++
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h  |  3 ++-
+ 4 files changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/device.c b/drivers/infiniband/hw/cxgb4/device.c
+index 2b873779a03b..ca8a73cea11b 100644
+--- a/drivers/infiniband/hw/cxgb4/device.c
++++ b/drivers/infiniband/hw/cxgb4/device.c
+@@ -1251,6 +1251,7 @@ static int c4iw_uld_state_change(void *handle, enum cxgb4_state new_state)
+ 		if (ctx->dev)
+ 			c4iw_remove(ctx);
+ 		break;
++	case CXGB4_STATE_FATAL_ERROR:
+ 	case CXGB4_STATE_START_RECOVERY:
+ 		pr_info("%s: Fatal Error\n", pci_name(ctx->lldi.pdev));
+ 		if (ctx->dev) {
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+index c8c8191f92a8..3f45e1bf7746 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+@@ -851,6 +851,7 @@ struct adapter {
+ 	struct work_struct tid_release_task;
+ 	struct work_struct db_full_task;
+ 	struct work_struct db_drop_task;
++	struct work_struct fatal_err_notify_task;
+ 	bool tid_release_task_busy;
+ 
+ 	/* lock for mailbox cmd list */
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index 14f253929a59..7467aaf09175 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -2810,6 +2810,14 @@ static const struct ethtool_ops cxgb4_mgmt_ethtool_ops = {
+ 	.get_drvinfo       = get_drvinfo,
+ };
+ 
++static void notify_fatal_err(struct work_struct *work)
++{
++	struct adapter *adap;
++
++	adap = container_of(work, struct adapter, fatal_err_notify_task);
++	notify_ulds(adap, CXGB4_STATE_FATAL_ERROR);
++}
++
+ void t4_fatal_err(struct adapter *adap)
+ {
+ 	int port;
+@@ -2834,6 +2842,7 @@ void t4_fatal_err(struct adapter *adap)
+ 		netif_carrier_off(dev);
+ 	}
+ 	dev_alert(adap->pdev_dev, "encountered fatal error, adapter stopped\n");
++	queue_work(adap->workq, &adap->fatal_err_notify_task);
+ }
+ 
+ static void setup_memwin(struct adapter *adap)
+@@ -4731,6 +4740,7 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 	INIT_WORK(&adapter->tid_release_task, process_tid_release_list);
+ 	INIT_WORK(&adapter->db_full_task, process_db_full);
+ 	INIT_WORK(&adapter->db_drop_task, process_db_drop);
++	INIT_WORK(&adapter->fatal_err_notify_task, notify_fatal_err);
+ 
+ 	err = t4_prep_adapter(adapter);
+ 	if (err)
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h
+index 6e74040af49a..25f49d13b841 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h
+@@ -242,7 +242,8 @@ enum cxgb4_state {
+ 	CXGB4_STATE_UP,
+ 	CXGB4_STATE_START_RECOVERY,
+ 	CXGB4_STATE_DOWN,
+-	CXGB4_STATE_DETACH
++	CXGB4_STATE_DETACH,
++	CXGB4_STATE_FATAL_ERROR
+ };
+ 
+ enum cxgb4_control {
+-- 
+2.9.3
+

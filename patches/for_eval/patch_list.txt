@@ -1,0 +1,22 @@
+
+0001-patch_chelsio_driver-all-rhel7.4-applicable-patches-.patch
+0002-SVC-malloc-changes.patch
+
+0003-cxgb4-notify-fatal-error-to-uld-drivers.patch			8b7372c101a5f9f38a092ab2533a75fc85c6e52a
+0004-iw_cxgb4-Add-ib_device-get_netdev-support.patch			f215a3d2448ae77253f0b93dcc37114779f51778
+0005-cxgb4-update-dump-collection-logic-to-use-compressio.patch		56cf2635ce30febd448dc78ff5361e4d9ad2fc0e
+0006-cxgb4-use-zlib-deflate-to-compress-firmware-dump.patch		91c1953de38725d41cf9a677569a8cc280065064
+0007-cxgb4-enable-ZLIB_DEFLATE-when-building-cxgb4.patch		a1cf9c9ffe652a4f109eb2cd8e69d8fcdb855d00
+0008-cxgb4-properly-initialize-variables.patch				325694e6c3484959d066d5c0e9bff4c5966491a3
+0009-cxgb4-reset-FW_OK-flag-on-firmware-crash.patch			825b2b6fd949b0042f3793daafa59b742c9e9d7a
+0010-cxgb4-fix-incorrect-condition-for-using-firmware-LDS.patch		ebb5568fe27794cdcf18c8d9dc6b80dae98d79ec
+0011-cxgb4-use-backdoor-access-to-collect-dumps-when-firm.patch		770ca3477a5bafe4422ead691500d2d99836dc1d
+0012-cxgb4-rework-on-chip-memory-read.patch				1a4330cdbf2270abcc0703837ef73148d0a75ccc
+0013-cxgb4-speed-up-on-chip-memory-read.patch				7494f980ca0503e3eec6f4ba508186d269b37e7f
+0014-cxgb4-fix-trailing-zero-in-CIM-LA-dump.patch			e6f02a4d57cc438099bc8abfba43ba1400d77b38
+
+0015-RDMA-cxgb4-release-hw-resources-on-device-removal.patch		26bff1bd74a4f7417509a83295614e9dab995b2a
+0016-iw_cxgb4-Atomically-flush-per-QP-HW-CQEs.patch			2df19e19ae90d94fd8724083f161f368a2797537
+
+0001-cxgb4-collect-cudbg-debug-logs-during-kernel-crash.patch		Not available in upstream.
+0002-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.

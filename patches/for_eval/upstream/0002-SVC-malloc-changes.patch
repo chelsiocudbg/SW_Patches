@@ -1,0 +1,336 @@
+From aa6838e905410d7720a64f42979c75a96e3b1593 Mon Sep 17 00:00:00 2001
+From: Potnuri Bharat Teja <bharat@chelsio.com>
+Date: Tue, 8 May 2018 14:36:44 +0530
+Subject: [PATCH 02/14] SVC: malloc changes
+
+This patch contains the malloc changes specific to SVC.
+---
+ drivers/infiniband/hw/cxgb4/device.c   | 61 +++++++++++++++++++++++
+ drivers/infiniband/hw/cxgb4/iw_cxgb4.h | 30 ++++++++++++
+ drivers/infiniband/hw/cxgb4/qp.c       | 89 ++++++++++++++++++----------------
+ 3 files changed, 138 insertions(+), 42 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/device.c b/drivers/infiniband/hw/cxgb4/device.c
+index bce2eb66d964..2b873779a03b 100644
+--- a/drivers/infiniband/hw/cxgb4/device.c
++++ b/drivers/infiniband/hw/cxgb4/device.c
+@@ -65,6 +65,19 @@ module_param(c4iw_wr_log_size_order, int, 0444);
+ MODULE_PARM_DESC(c4iw_wr_log_size_order,
+ 		 "Number of entries (log2) in the work request timing log.");
+ 
++
++/* SVC mem func declaration */
++static void svc_setup_func_ptr(void);
++static void * svc_default_kmalloc( size_t size, int flag, void* qp_ptr);
++static void svc_default_kfree(void *ptr, void* qp_ptr);
++static void * svc_default_dma_zalloc(struct device *dev, size_t size, dma_addr_t *dma_handle, int flag, void* qp_ptr);
++static void svc_default_dma_free(struct device *dev, size_t size, void * ptr, dma_addr_t dma_handle, void* qp_ptr);
++
++void *(*svc_kmalloc)(size_t size,int flags, void* qp_ptr);
++void (*svc_kfree)(void *ptr, void* qp_ptr);
++void *(*svc_dma_zalloc)(struct device *dev, size_t size, dma_addr_t* dma_handle, int flag, void*qp_ptr);
++void (*svc_dma_free)(struct device *dev, size_t size, void *ptr, dma_addr_t dma_handle, void* qp_ptr);
++
+ struct uld_ctx {
+ 	struct list_head entry;
+ 	struct cxgb4_lld_info lldi;
+@@ -1546,10 +1559,58 @@ struct c4iw_wr_wait *c4iw_alloc_wr_wait(gfp_t gfp)
+ 	return wr_waitp;
+ }
+ 
++static void svc_setup_func_ptr(void)
++{
++    svc_kmalloc = &svc_default_kmalloc;
++    svc_kfree = &svc_default_kfree;
++    svc_dma_zalloc = &svc_default_dma_zalloc;
++    svc_dma_free = &svc_default_dma_free;
++
++    return;
++}
++
++static void * svc_default_kmalloc( size_t size, int flag, void* qp_ptr)
++{
++    return kmalloc(size, GFP_KERNEL);
++}
++
++static void svc_default_kfree(void *ptr, void* qp_ptr)
++{
++    kfree(ptr);
++}
++
++static void * svc_default_dma_zalloc(struct device *dev, size_t size, dma_addr_t *dma_handle, int flag, void* qp_ptr)
++{
++    return dma_zalloc_coherent(dev, size, dma_handle, flag);
++}
++
++static void svc_default_dma_free(struct device *dev, size_t size, void *ptr, dma_addr_t dma_handle, void* qp_ptr)
++{
++    dma_free_coherent(dev, size, ptr, dma_handle);
++}
++
++int setup_svc_mem_alloc_cxgb( void *(*svc_iser_kmalloc)(size_t,int,void*),
++                      void(*svc_iser_kfree)(void *,void*),
++                      void *(*svc_iser_dma_zalloc)(struct device*, size_t,dma_addr_t*,int,void*),
++                      void (*svc_iser_dma_free)(struct device*,size_t,void*, dma_addr_t,void*))
++{
++    svc_kmalloc = svc_iser_kmalloc;
++    svc_kfree = svc_iser_kfree;
++    svc_dma_zalloc = svc_iser_dma_zalloc;
++    svc_dma_free = svc_iser_dma_free;
++
++    return 1;
++}
++EXPORT_SYMBOL_GPL(setup_svc_mem_alloc_cxgb);
++
++
+ static int __init c4iw_init_module(void)
+ {
+ 	int err;
+ 
++    /* Initialize function pointers to default functions */
++    svc_setup_func_ptr();
++
+ 	err = c4iw_cm_init();
+ 	if (err)
+ 		return err;
+diff --git a/drivers/infiniband/hw/cxgb4/iw_cxgb4.h b/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
+index 06e22c51a8af..1403c40b7fb0 100644
+--- a/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
++++ b/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
+@@ -75,6 +75,36 @@
+ #define PBL_OFF(rdev_p, a) ((a) - (rdev_p)->lldi.vr->pbl.start)
+ #define RQT_OFF(rdev_p, a) ((a) - (rdev_p)->lldi.vr->rq.start)
+ 
++/*
++ * SVC kmalloc/DMA alloc definitions for memory allocation
++ * Macros used by adapter drivers to allocate and deallocate
++ * the QP memory
++ */
++#define SVC_KMALLOC(x,y,z) (*svc_kmalloc)(x,y,z)
++#define SVC_KFREE(x,z) (*svc_kfree)(x,z)
++#define SVC_DMA_ZALLOC(a,b,c,d,e) (*svc_dma_zalloc)(a,b,c,d,e)
++#define SVC_DMA_FREE(a,b,c,d,e)   (*svc_dma_free)(a,b,c,d,e)
++
++extern void *(*svc_kmalloc)(size_t size,int flags, void* qp_ptr);
++extern void (*svc_kfree)(void *ptr,void* qp_ptr);
++extern void *(*svc_dma_zalloc)(struct device*, size_t, dma_addr_t*,int,void*);
++extern void (*svc_dma_free)(struct device*, size_t, void*, dma_addr_t,void*);
++/* Every object type with different sizes should be listed atleast once
++ * Currently define for CXGB4 driver
++ *
++ * define new macros for a new adapter driver
++ * if RQ, SQ entry size differ from that of CXGB4
++ */
++#define FLAG_CXGB_RQ    1
++#define FLAG_CXGB_SQ    2
++
++int setup_svc_mem_alloc_cxgb( void *(*svc_iser_kmalloc)(size_t,int,void*),
++                        void(*svc_iser_kfree)(void *,void*),
++                        void *(*svc_iser_dma_zalloc)(struct device*, size_t,dma_addr_t*,int,void*),
++                        void (*svc_iser_dma_free)(struct device*, size_t,void*,dma_addr_t,void*));
++
++/* SVC Allocation ends here */
++
+ static inline void *cplhdr(struct sk_buff *skb)
+ {
+ 	return skb->data;
+diff --git a/drivers/infiniband/hw/cxgb4/qp.c b/drivers/infiniband/hw/cxgb4/qp.c
+index bffb359a54b0..474703a6fcca 100644
+--- a/drivers/infiniband/hw/cxgb4/qp.c
++++ b/drivers/infiniband/hw/cxgb4/qp.c
+@@ -96,18 +96,20 @@ static void dealloc_oc_sq(struct c4iw_rdev *rdev, struct t4_sq *sq)
+ 	c4iw_ocqp_pool_free(rdev, sq->dma_addr, sq->memsize);
+ }
+ 
+-static void dealloc_host_sq(struct c4iw_rdev *rdev, struct t4_sq *sq)
++static void dealloc_host_sq(struct c4iw_rdev *rdev, struct t4_sq *sq, struct ib_qp *qp_ptr)
+ {
+-	dma_free_coherent(&(rdev->lldi.pdev->dev), sq->memsize, sq->queue,
+-			  pci_unmap_addr(sq, mapping));
++    /*dma_free_coherent(&(rdev->lldi.pdev->dev), sq->memsize, sq->queue,
++              pci_unmap_addr(sq, mapping));*/
++    SVC_DMA_FREE(&(rdev->lldi.pdev->dev), sq->memsize,
++                        sq->queue,pci_unmap_addr(sq, mapping), qp_ptr);
+ }
+ 
+-static void dealloc_sq(struct c4iw_rdev *rdev, struct t4_sq *sq)
++static void dealloc_sq(struct c4iw_rdev *rdev, struct t4_sq *sq, struct ib_qp *qp_ptr)
+ {
+ 	if (t4_sq_onchip(sq))
+ 		dealloc_oc_sq(rdev, sq);
+ 	else
+-		dealloc_host_sq(rdev, sq);
++		dealloc_host_sq(rdev, sq, qp_ptr);
+ }
+ 
+ static int alloc_oc_sq(struct c4iw_rdev *rdev, struct t4_sq *sq)
+@@ -125,10 +127,10 @@ static int alloc_oc_sq(struct c4iw_rdev *rdev, struct t4_sq *sq)
+ 	return 0;
+ }
+ 
+-static int alloc_host_sq(struct c4iw_rdev *rdev, struct t4_sq *sq)
++static int alloc_host_sq(struct c4iw_rdev *rdev, struct t4_sq *sq, struct ib_qp *qp_ptr)
+ {
+-	sq->queue = dma_alloc_coherent(&(rdev->lldi.pdev->dev), sq->memsize,
+-				       &(sq->dma_addr), GFP_KERNEL);
++    sq->queue = SVC_DMA_ZALLOC(&(rdev->lldi.pdev->dev), sq->memsize, 
++                               &(sq->dma_addr), GFP_KERNEL, qp_ptr);
+ 	if (!sq->queue)
+ 		return -ENOMEM;
+ 	sq->phys_addr = virt_to_phys(sq->queue);
+@@ -136,33 +138,34 @@ static int alloc_host_sq(struct c4iw_rdev *rdev, struct t4_sq *sq)
+ 	return 0;
+ }
+ 
+-static int alloc_sq(struct c4iw_rdev *rdev, struct t4_sq *sq, int user)
++static int alloc_sq(struct c4iw_rdev *rdev, struct t4_sq *sq, int user, struct ib_qp* qp_ptr)
+ {
+ 	int ret = -ENOSYS;
+ 	if (user)
+ 		ret = alloc_oc_sq(rdev, sq);
+ 	if (ret)
+-		ret = alloc_host_sq(rdev, sq);
++		ret = alloc_host_sq(rdev, sq, qp_ptr);
+ 	return ret;
+ }
+ 
+ static int destroy_qp(struct c4iw_rdev *rdev, struct t4_wq *wq,
+-		      struct c4iw_dev_ucontext *uctx)
++		      struct c4iw_dev_ucontext *uctx, struct ib_qp* qp_ptr)
+ {
+ 	/*
+-	 * uP clears EQ contexts when the connection exits rdma mode,
+-	 * so no need to post a RESET WR for these EQs.
+-	 */
+-	dma_free_coherent(&(rdev->lldi.pdev->dev),
+-			  wq->rq.memsize, wq->rq.queue,
+-			  dma_unmap_addr(&wq->rq, mapping));
+-	dealloc_sq(rdev, &wq->sq);
+-	c4iw_rqtpool_free(rdev, wq->rq.rqt_hwaddr, wq->rq.rqt_size);
+-	kfree(wq->rq.sw_rq);
+-	kfree(wq->sq.sw_sq);
+-	c4iw_put_qpid(rdev, wq->rq.qid, uctx);
+-	c4iw_put_qpid(rdev, wq->sq.qid, uctx);
+-	return 0;
++     * uP clears EQ contexts when the connection exits rdma mode,
++     * so no need to post a RESET WR for these EQs.
++     */
++    SVC_DMA_FREE(&(rdev->lldi.pdev->dev), wq->rq.memsize,
++                    wq->rq.queue,dma_unmap_addr(&wq->rq, mapping), qp_ptr);
++    dealloc_sq(rdev, &wq->sq, qp_ptr);
++    c4iw_rqtpool_free(rdev, wq->rq.rqt_hwaddr, wq->rq.rqt_size);
++
++    SVC_KFREE(wq->rq.sw_rq, qp_ptr);
++    SVC_KFREE(wq->sq.sw_sq, qp_ptr);
++    c4iw_put_qpid(rdev, wq->rq.qid, uctx);
++    c4iw_put_qpid(rdev, wq->sq.qid, uctx);
++
++    return 0;
+ }
+ 
+ /*
+@@ -195,7 +198,8 @@ void __iomem *c4iw_bar2_addrs(struct c4iw_rdev *rdev, unsigned int qid,
+ static int create_qp(struct c4iw_rdev *rdev, struct t4_wq *wq,
+ 		     struct t4_cq *rcq, struct t4_cq *scq,
+ 		     struct c4iw_dev_ucontext *uctx,
+-		     struct c4iw_wr_wait *wr_waitp)
++		     struct c4iw_wr_wait *wr_waitp, 
++             struct ib_qp* qp_ptr)
+ {
+ 	int user = (uctx != &rdev->uctx);
+ 	struct fw_ri_res_wr *res_wr;
+@@ -216,15 +220,15 @@ static int create_qp(struct c4iw_rdev *rdev, struct t4_wq *wq,
+ 	}
+ 
+ 	if (!user) {
+-		wq->sq.sw_sq = kzalloc(wq->sq.size * sizeof *wq->sq.sw_sq,
+-				 GFP_KERNEL);
+-		if (!wq->sq.sw_sq) {
++        wq->sq.sw_sq = SVC_KMALLOC(wq->sq.size * sizeof *wq->sq.sw_sq,
++                 FLAG_CXGB_SQ, qp_ptr);
++        if (!wq->sq.sw_sq) {
+ 			ret = -ENOMEM;
+ 			goto free_rq_qid;
+ 		}
+ 
+-		wq->rq.sw_rq = kzalloc(wq->rq.size * sizeof *wq->rq.sw_rq,
+-				 GFP_KERNEL);
++        wq->rq.sw_rq = SVC_KMALLOC(wq->rq.size * sizeof *wq->rq.sw_rq,
++                 FLAG_CXGB_RQ, qp_ptr);
+ 		if (!wq->rq.sw_rq) {
+ 			ret = -ENOMEM;
+ 			goto free_sw_sq;
+@@ -241,15 +245,14 @@ static int create_qp(struct c4iw_rdev *rdev, struct t4_wq *wq,
+ 		goto free_sw_rq;
+ 	}
+ 
+-	ret = alloc_sq(rdev, &wq->sq, user);
++	ret = alloc_sq(rdev, &wq->sq, user, qp_ptr);
+ 	if (ret)
+ 		goto free_hwaddr;
+ 	memset(wq->sq.queue, 0, wq->sq.memsize);
+ 	dma_unmap_addr_set(&wq->sq, mapping, wq->sq.dma_addr);
+ 
+-	wq->rq.queue = dma_alloc_coherent(&(rdev->lldi.pdev->dev),
+-					  wq->rq.memsize, &(wq->rq.dma_addr),
+-					  GFP_KERNEL);
++    wq->rq.queue = SVC_DMA_ZALLOC(&(rdev->lldi.pdev->dev),wq->rq.memsize,
++                                   &(wq->rq.dma_addr), GFP_KERNEL, qp_ptr);
+ 	if (!wq->rq.queue) {
+ 		ret = -ENOMEM;
+ 		goto free_sq;
+@@ -364,17 +367,19 @@ static int create_qp(struct c4iw_rdev *rdev, struct t4_wq *wq,
+ 
+ 	return 0;
+ free_dma:
+-	dma_free_coherent(&(rdev->lldi.pdev->dev),
++	/*dma_free_coherent(&(rdev->lldi.pdev->dev),
+ 			  wq->rq.memsize, wq->rq.queue,
+-			  dma_unmap_addr(&wq->rq, mapping));
++			  dma_unmap_addr(&wq->rq, mapping));*/
++    SVC_DMA_FREE(&(rdev->lldi.pdev->dev),wq->rq.memsize, wq->rq.queue,
++                        dma_unmap_addr(&wq->rq, mapping), qp_ptr);
+ free_sq:
+-	dealloc_sq(rdev, &wq->sq);
++	dealloc_sq(rdev, &wq->sq, qp_ptr);
+ free_hwaddr:
+ 	c4iw_rqtpool_free(rdev, wq->rq.rqt_hwaddr, wq->rq.rqt_size);
+ free_sw_rq:
+-	kfree(wq->rq.sw_rq);
++    SVC_KFREE(wq->rq.sw_rq, qp_ptr);
+ free_sw_sq:
+-	kfree(wq->sq.sw_sq);
++    SVC_KFREE(wq->sq.sw_sq, qp_ptr);
+ free_rq_qid:
+ 	c4iw_put_qpid(rdev, wq->rq.qid, uctx);
+ free_sq_qid:
+@@ -722,7 +727,7 @@ static void free_qp_work(struct work_struct *work)
+ 
+ 	pr_debug("qhp %p ucontext %p\n", qhp, ucontext);
+ 	destroy_qp(&rhp->rdev, &qhp->wq,
+-		   ucontext ? &ucontext->uctx : &rhp->rdev.uctx);
++		   ucontext ? &ucontext->uctx : &rhp->rdev.uctx, &qhp->ibqp);
+ 
+ 	if (ucontext)
+ 		c4iw_put_ucontext(ucontext);
+@@ -1885,7 +1890,7 @@ struct ib_qp *c4iw_create_qp(struct ib_pd *pd, struct ib_qp_init_attr *attrs,
+ 
+ 	ret = create_qp(&rhp->rdev, &qhp->wq, &schp->cq, &rchp->cq,
+ 			ucontext ? &ucontext->uctx : &rhp->rdev.uctx,
+-			qhp->wr_waitp);
++			qhp->wr_waitp, &qhp->ibqp);
+ 	if (ret)
+ 		goto err_free_wr_wait;
+ 
+@@ -2027,7 +2032,7 @@ err_remove_handle:
+ 	remove_handle(rhp, &rhp->qpidr, qhp->wq.sq.qid);
+ err_destroy_qp:
+ 	destroy_qp(&rhp->rdev, &qhp->wq,
+-		   ucontext ? &ucontext->uctx : &rhp->rdev.uctx);
++		   ucontext ? &ucontext->uctx : &rhp->rdev.uctx, &qhp->ibqp);
+ err_free_wr_wait:
+ 	c4iw_put_wr_wait(qhp->wr_waitp);
+ err_free_qhp:
+-- 
+2.9.3
+

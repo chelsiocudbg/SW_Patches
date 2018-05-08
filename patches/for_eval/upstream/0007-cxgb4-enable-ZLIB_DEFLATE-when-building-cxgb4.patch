@@ -1,0 +1,77 @@
+From e54d0500cf42a14c32bcbbcf945d13c52fb6f61b Mon Sep 17 00:00:00 2001
+From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date: Mon, 2 Apr 2018 17:26:31 +0530
+Subject: [PATCH 07/14] cxgb4: enable ZLIB_DEFLATE when building cxgb4
+
+commit a1cf9c9ffe652a4f109eb2cd8e69d8fcdb855d00
+Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date:   Wed Jan 24 13:31:04 2018 +0530
+
+    cxgb4: enable ZLIB_DEFLATE when building cxgb4
+
+    Fixes:
+    drivers/net/ethernet/chelsio/cxgb4/cudbg_zlib.c:39:5: error:
+    redefinition of 'cudbg_compress_buff'
+        int cudbg_compress_buff(struct cudbg_init *pdbg_init,
+            ^~~~~~~~~~~~~~~~~~~
+       In file included from
+    drivers/net/ethernet/chelsio/cxgb4/cudbg_zlib.c:23:0:
+       drivers/net/ethernet/chelsio/cxgb4/cudbg_zlib.h:45:19: note: previous
+    definition of 'cudbg_compress_buff' was here
+        static inline int cudbg_compress_buff(struct cudbg_init *pdbg_init,
+                          ^~~~~~~~~~~~~~~~~~~
+
+    Fixes: 91c1953de387 ("cxgb4: use zlib deflate to compress firmware dump")
+    Signed-off-by: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+    Signed-off-by: Ganesh Goudar <ganeshgr@chelsio.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/chelsio/cxgb4/Makefile     |  2 +-
+ drivers/net/ethernet/chelsio/cxgb4/cudbg_zlib.h | 13 -------------
+ 2 files changed, 1 insertion(+), 14 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/Makefile b/drivers/net/ethernet/chelsio/cxgb4/Makefile
+index 98baabbdd43b..ffa61f943a67 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/Makefile
++++ b/drivers/net/ethernet/chelsio/cxgb4/Makefile
+@@ -6,7 +6,7 @@ obj-$(CONFIG_CHELSIO_T4) += cxgb4.o
+ 
+ cxgb4-objs := cxgb4_main.o l2t.o t4_hw.o sge.o clip_tbl.o cxgb4_ethtool.o \
+ 	      cxgb4_uld.o sched.o cxgb4_filter.o cxgb4_tc_u32.o \
+-	      cxgb4_cudbg.o cudbg_common.o cudbg_lib.o
++	      cxgb4_cudbg.o cudbg_common.o cudbg_lib.o cudbg_zlib.o
+ cxgb4-$(CONFIG_CHELSIO_T4_DCB) +=  cxgb4_dcb.o
+ cxgb4-$(CONFIG_DEBUG_FS) += cxgb4_debugfs.o
+ cxgb4-$(CONFIG_ZLIB_DEFLATE) += cudbg_zlib.o
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cudbg_zlib.h b/drivers/net/ethernet/chelsio/cxgb4/cudbg_zlib.h
+index 9d55c4c38c84..60d23805dfc3 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cudbg_zlib.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cudbg_zlib.h
+@@ -33,24 +33,11 @@ struct cudbg_compress_hdr {
+ 
+ static inline int cudbg_get_workspace_size(void)
+ {
+-#ifdef CONFIG_ZLIB_DEFLATE
+ 	return zlib_deflate_workspacesize(CUDBG_ZLIB_WIN_BITS,
+ 					  CUDBG_ZLIB_MEM_LVL);
+-#else
+-	return 0;
+-#endif /* CONFIG_ZLIB_DEFLATE */
+ }
+ 
+-#ifndef CONFIG_ZLIB_DEFLATE
+-static inline int cudbg_compress_buff(struct cudbg_init *pdbg_init,
+-				      struct cudbg_buffer *pin_buff,
+-				      struct cudbg_buffer *pout_buff)
+-{
+-	return 0;
+-}
+-#else
+ int cudbg_compress_buff(struct cudbg_init *pdbg_init,
+ 			struct cudbg_buffer *pin_buff,
+ 			struct cudbg_buffer *pout_buff);
+-#endif /* CONFIG_ZLIB_DEFLATE */
+ #endif /* __CUDBG_ZLIB_H__ */
+-- 
+2.9.3
+

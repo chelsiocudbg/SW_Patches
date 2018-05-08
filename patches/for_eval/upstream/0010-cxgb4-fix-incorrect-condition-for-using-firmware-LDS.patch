@@ -1,0 +1,38 @@
+From aa5e6a0432345bbcb59807e2954ce4390d85bef5 Mon Sep 17 00:00:00 2001
+From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date: Mon, 2 Apr 2018 17:28:35 +0530
+Subject: [PATCH 10/14] cxgb4: fix incorrect condition for using firmware LDST
+ commands
+
+commit ebb5568fe27794cdcf18c8d9dc6b80dae98d79ec
+Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date:   Fri Jan 26 17:05:55 2018 +0530
+
+    cxgb4: fix incorrect condition for using firmware LDST commands
+
+    Only contact firmware if it's alive _AND_ if use_bd (use backdoor
+    access) is not set when issuing FW_LDST_CMD.
+
+    Signed-off-by: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+    Signed-off-by: Ganesh Goudar <ganeshgr@chelsio.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/chelsio/cxgb4/t4_hw.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+index 2f5cfb97b8a3..78b905174c72 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+@@ -4957,7 +4957,7 @@ int t4_read_rss(struct adapter *adapter, u16 *map)
+ 
+ static unsigned int t4_use_ldst(struct adapter *adap)
+ {
+-	return (adap->flags & FW_OK) || !adap->use_bd;
++	return (adap->flags & FW_OK) && !adap->use_bd;
+ }
+ 
+ /**
+-- 
+2.9.3
+

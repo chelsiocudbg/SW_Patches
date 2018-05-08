@@ -1,0 +1,59 @@
+From 671fba04be1a768987d3f36c431a0a8512d787a6 Mon Sep 17 00:00:00 2001
+From: Potnuri Bharat Teja <bharat@chelsio.com>
+Date: Mon, 26 Mar 2018 13:00:22 +0530
+Subject: [PATCH 04/14] iw_cxgb4: Add ib_device->get_netdev support
+
+commit f215a3d2448ae77253f0b93dcc37114779f51778
+Author: Steve Wise <swise@opengridcomputing.com>
+Date:   Thu Mar 22 12:53:35 2018 -0700
+
+    iw_cxgb4: Add ib_device->get_netdev support
+
+    This is useful to rdma ULPs.
+
+    Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+    Signed-off-by: Jason Gunthorpe <jgg@mellanox.com>
+---
+ drivers/infiniband/hw/cxgb4/provider.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/drivers/infiniband/hw/cxgb4/provider.c b/drivers/infiniband/hw/cxgb4/provider.c
+index 2c959ab2deac..649e9dc1e5e5 100644
+--- a/drivers/infiniband/hw/cxgb4/provider.c
++++ b/drivers/infiniband/hw/cxgb4/provider.c
+@@ -532,6 +532,24 @@ static void get_dev_fw_str(struct ib_device *dev, char *str,
+ 		 FW_HDR_FW_VER_BUILD_G(c4iw_dev->rdev.lldi.fw_vers));
+ }
+ 
++static struct net_device *get_netdev(struct ib_device *dev, u8 port)
++{
++	struct c4iw_dev *c4iw_dev = container_of(dev, struct c4iw_dev, ibdev);
++	struct c4iw_rdev *rdev = &c4iw_dev->rdev;
++	struct net_device *ndev;
++
++	if (!port || port > rdev->lldi.nports)
++		return NULL;
++
++	rcu_read_lock();
++	ndev = rdev->lldi.ports[port - 1];
++	if (ndev)
++		dev_hold(ndev);
++	rcu_read_unlock();
++
++	return ndev;
++}
++
+ int c4iw_register_device(struct c4iw_dev *dev)
+ {
+ 	int ret;
+@@ -608,6 +626,7 @@ int c4iw_register_device(struct c4iw_dev *dev)
+ 	dev->ibdev.uverbs_abi_ver = C4IW_UVERBS_ABI_VERSION;
+ 	dev->ibdev.get_port_immutable = c4iw_port_immutable;
+ 	dev->ibdev.get_dev_fw_str = get_dev_fw_str;
++	dev->ibdev.get_netdev = get_netdev;
+ 
+ 	dev->ibdev.iwcm = kmalloc(sizeof(struct iw_cm_verbs), GFP_KERNEL);
+ 	if (!dev->ibdev.iwcm)
+-- 
+2.9.3
+

@@ -13,9 +13,9 @@
 2. Patch the kernel source. Apply all the patches in the order of patch
 numbering.
 ```
-# cd <path to kernel source>
-# for i in /home/SW_Patches/patches/3.10.0-693.17.1/upstream/*.patch; do patch -p1 < $i; done
-# for i in /home/SW_Patches/patches/3.10.0-693.17.1/cudbg/*.patch; do patch -p1 < $i; done
+# cd <path to kernel source to 3.10.0-693.17.1 kernel>
+# for i in /home/SW_Patches/patches/for_eval/upstream/*.patch; do patch -p1 < $i; done
+# for i in /home/SW_Patches/patches/for_eval/cudbg/*.patch; do patch -p1 < $i; done
 ```
 
 3. Ensure that all the Chelsio driver modules are selected in the kernel
