@@ -17,6 +17,11 @@
 
 0015-RDMA-cxgb4-release-hw-resources-on-device-removal.patch		26bff1bd74a4f7417509a83295614e9dab995b2a
 0016-iw_cxgb4-Atomically-flush-per-QP-HW-CQEs.patch			2df19e19ae90d94fd8724083f161f368a2797537
+0017-vmcore-add-API-to-collect-hardware-dump-in-second-ke.patch		2724273e8fd00b512596a77ee063f49b25f36507
+0018-vmcore-append-device-dumps-to-vmcore-as-elf-notes.patch		7efe48df8a3df6d089d2e9a1d429c82cc5dcf2de
+0019-cxgb4-collect-hardware-dump-in-second-kernel.patch			1dde532dd0520a948fbc82f4522183104ee4808b
+0020-net-ethtool-add-support-for-forward-error-correction.patch		1a5f3da20bd966220931239fbd31e6ac6ff42251
+0021-cxgb4-core-hardware-firmware-support-for-Forward-Err.patch		158a5c0a24d1d83b3d7e7ba159eafbae1b9f9d60
+0022-cxgb4-ethtool-forward-error-correction-management-su.patch		7fece840e35e52c7114dcf874a72b2c962923800
 
-0001-cxgb4-collect-cudbg-debug-logs-during-kernel-crash.patch		Not available in upstream.
 0002-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.

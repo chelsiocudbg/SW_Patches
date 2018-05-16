@@ -1,0 +1,119 @@
+From 5a263ca5bf2c7c0c7a6f7b3f68ae7234420f07ea Mon Sep 17 00:00:00 2001
+From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date: Tue, 15 May 2018 18:59:45 +0530
+Subject: [PATCH 19/22] cxgb4: collect hardware dump in second kernel
+
+commit 1dde532dd0520a948fbc82f4522183104ee4808b
+Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date:   Wed May 2 15:17:19 2018 +0530
+
+    cxgb4: collect hardware dump in second kernel
+
+    Register callback to collect hardware/firmware dumps in second kernel
+    before hardware/firmware is initialized. The dumps for each device
+    will be available as elf notes in /proc/vmcore in second kernel.
+
+    Signed-off-by: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+    Signed-off-by: Ganesh Goudar <ganeshgr@chelsio.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h       |  3 +++
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c | 25 ++++++++++++++++++++++++
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h |  3 +++
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c  | 10 ++++++++++
+ 4 files changed, 41 insertions(+)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+index 4f6a2308..f790a2fc 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+@@ -48,6 +48,7 @@
+ #include <linux/vmalloc.h>
+ #include <linux/etherdevice.h>
+ #include <linux/net_tstamp.h>
++#include <linux/crash_dump.h>
+ #include <asm/io.h>
+ #include "t4_chip_type.h"
+ #include "cxgb4_uld.h"
+@@ -879,6 +880,8 @@ struct adapter {
+         /* Ethtool Dump */
+         struct ethtool_dump eth_dump;
+ 
++	/* Dump buffer for collecting logs in kdump kernel */
++	struct vmcoredd_data vmcoredd;
+ };
+ 
+ /* Support for "sched-class" command to allow a TX Scheduling Class to be
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c
+index 143686c6..085691eb 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c
+@@ -488,3 +488,28 @@ void cxgb4_init_ethtool_dump(struct adapter *adapter)
+ 	adapter->eth_dump.version = adapter->params.fw_vers;
+ 	adapter->eth_dump.len = 0;
+ }
++
++static int cxgb4_cudbg_vmcoredd_collect(struct vmcoredd_data *data, void *buf)
++{
++	struct adapter *adap = container_of(data, struct adapter, vmcoredd);
++	u32 len = data->size;
++
++	return cxgb4_cudbg_collect(adap, buf, &len, CXGB4_ETH_DUMP_ALL);
++}
++
++int cxgb4_cudbg_vmcore_add_dump(struct adapter *adap)
++{
++	struct vmcoredd_data *data = &adap->vmcoredd;
++	u32 len;
++
++	len = sizeof(struct cudbg_hdr) +
++	      sizeof(struct cudbg_entity_hdr) * CUDBG_MAX_ENTITY;
++	len += CUDBG_DUMP_BUFF_SIZE;
++
++	data->size = len;
++	snprintf(data->dump_name, sizeof(data->dump_name), "%s_%s",
++		 cxgb4_driver_name, adap->name);
++	data->vmcoredd_callback = cxgb4_cudbg_vmcoredd_collect;
++
++	return vmcore_add_device_dump(data);
++}
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h
+index ce1ac9a1..ef59ba1e 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h
+@@ -41,8 +41,11 @@ enum CXGB4_ETHTOOL_DUMP_FLAGS {
+ 	CXGB4_ETH_DUMP_HW = (1 << 1), /* various FW and HW dumps */
+ };
+ 
++#define CXGB4_ETH_DUMP_ALL (CXGB4_ETH_DUMP_MEM | CXGB4_ETH_DUMP_HW)
++
+ u32 cxgb4_get_dump_length(struct adapter *adap, u32 flag);
+ int cxgb4_cudbg_collect(struct adapter *adap, void *buf, u32 *buf_size,
+ 			u32 flag);
+ void cxgb4_init_ethtool_dump(struct adapter *adapter);
++int cxgb4_cudbg_vmcore_add_dump(struct adapter *adap);
+ #endif /* __CXGB4_CUDBG_H__ */
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index 7467aaf0..0a9fc1a8 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -4746,6 +4746,16 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 	if (err)
+ 		goto out_free_adapter;
+ 
++	if (is_kdump_kernel()) {
++		/* Collect hardware state and append to /proc/vmcore */
++		err = cxgb4_cudbg_vmcore_add_dump(adapter);
++		if (err) {
++			dev_warn(adapter->pdev_dev,
++				 "Fail collecting vmcore device dump, err: %d. Continuing\n",
++				 err);
++			err = 0;
++		}
++	}
+ 
+ 	if (!is_t4(adapter->params.chip)) {
+ 		s_qpp = (QUEUESPERPAGEPF0_S +
+-- 
+2.14.1
+
