@@ -24,5 +24,6 @@
 0021-cxgb4-core-hardware-firmware-support-for-Forward-Err.patch		158a5c0a24d1d83b3d7e7ba159eafbae1b9f9d60
 0022-cxgb4-ethtool-forward-error-correction-management-su.patch		7fece840e35e52c7114dcf874a72b2c962923800
 0023-cxgb4-update-LE-TCAM-collection-for-T6.patch			8e725f7caafb8e820e05707fe9853023375438cf
+0024-cxgb4-collect-SGE-PF-VF-queue-map.patch				80a95a80d358ded600a517ea0a93fe86b8f8da84
 
 0002-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.
