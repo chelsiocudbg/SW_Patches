@@ -1,0 +1,48 @@
+From 031549b16719d2060644f0f2fc63d757d6234140 Mon Sep 17 00:00:00 2001
+From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date: Tue, 22 May 2018 13:39:58 +0530
+Subject: [PATCH 26/26] vmcore: move get_vmcore_size out of __init
+
+commit 44c752fe584d8b9f6e0756ecffa8691677471862
+Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date:   Mon May 21 19:07:50 2018 +0530
+
+    vmcore: move get_vmcore_size out of __init
+
+    Fix below build warning:
+
+    WARNING: vmlinux.o(.text+0x422bb8): Section mismatch in reference from
+    the function vmcore_add_device_dump() to the function
+    .init.text:get_vmcore_size.constprop.5()
+
+    The function vmcore_add_device_dump() references
+    the function __init get_vmcore_size.constprop.5().
+    This is often because vmcore_add_device_dump lacks a __init
+    annotation or the annotation of get_vmcore_size.constprop.5 is wrong.
+
+    Fixes: 7efe48df8a3d ("vmcore: append device dumps to vmcore as elf notes")
+    Signed-off-by: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+    Signed-off-by: Ganesh Goudar <ganeshgr@chelsio.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ fs/proc/vmcore.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/fs/proc/vmcore.c b/fs/proc/vmcore.c
+index 13af94dc..c458e6db 100644
+--- a/fs/proc/vmcore.c
++++ b/fs/proc/vmcore.c
+@@ -570,8 +570,8 @@ static struct vmcore* __init get_new_element(void)
+ 	return kzalloc(sizeof(struct vmcore), GFP_KERNEL);
+ }
+ 
+-static u64 __init get_vmcore_size(size_t elfsz, size_t elfnotesegsz,
+-				  struct list_head *vc_list)
++static u64 get_vmcore_size(size_t elfsz, size_t elfnotesegsz,
++			   struct list_head *vc_list)
+ {
+ 	u64 size;
+ 	struct vmcore *m;
+-- 
+2.14.1
+

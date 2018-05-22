@@ -26,5 +26,6 @@
 0023-cxgb4-update-LE-TCAM-collection-for-T6.patch			8e725f7caafb8e820e05707fe9853023375438cf
 0024-cxgb4-collect-SGE-PF-VF-queue-map.patch				80a95a80d358ded600a517ea0a93fe86b8f8da84
 0025-cxgb4-fix-offset-in-collecting-TX-rate-limit-info.patch		d775f26b295a0a303f7a73d7da46e04296484fe7
+0026-vmcore-move-get_vmcore_size-out-of-__init.patch			44c752fe584d8b9f6e0756ecffa8691677471862
 
 0002-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.
