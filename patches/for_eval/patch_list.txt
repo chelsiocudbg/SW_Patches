@@ -29,4 +29,4 @@ Patch									Commit-ID					Bugfix/Feature	Bug		Dependent Patches
 0025-cxgb4-fix-offset-in-collecting-TX-rate-limit-info.patch		d775f26b295a0a303f7a73d7da46e04296484fe7	Bugfix		26		0001
 0026-vmcore-move-get_vmcore_size-out-of-__init.patch			44c752fe584d8b9f6e0756ecffa8691677471862	Bugfix		26		0001, 0017, 0018, 0019
 
-0002-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.			Feature		26		0001, 0012, 0013
+0001-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.			Feature		26		0001, 0012, 0013
