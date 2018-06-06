@@ -1,0 +1,56 @@
+From f1d5fee5ab1a3347be74a0f0e95349d980443729 Mon Sep 17 00:00:00 2001
+From: Leon Romanovsky <leonro@mellanox.com>
+Date: Sun, 28 Jan 2018 11:17:23 +0200
+Subject: [PATCH 102/103] RDMA/core: Add resource tracking for create and
+ destroy PDs
+
+Track create and destroy operations of PD objects.
+
+Reviewed-by: Mark Bloch <markb@mellanox.com>
+Signed-off-by: Leon Romanovsky <leonro@mellanox.com>
+Reviewed-by: Steve Wise <swise@opengridcomputing.com>
+Signed-off-by: Jason Gunthorpe <jgg@mellanox.com>
+---
+ drivers/infiniband/core/uverbs_cmd.c | 2 ++
+ drivers/infiniband/core/verbs.c      | 5 +++++
+ 2 files changed, 7 insertions(+)
+
+diff --git a/drivers/infiniband/core/uverbs_cmd.c b/drivers/infiniband/core/uverbs_cmd.c
+index bf6d42004d35..e744d4a58a3c 100644
+--- a/drivers/infiniband/core/uverbs_cmd.c
++++ b/drivers/infiniband/core/uverbs_cmd.c
+@@ -581,6 +581,8 @@ ssize_t ib_uverbs_alloc_pd(struct ib_uverbs_file *file,
+ 
+ 	memset(&resp, 0, sizeof resp);
+ 	resp.pd_handle = uobj->id;
++	pd->res.type = RDMA_RESTRACK_PD;
++	rdma_restrack_add(&pd->res);
+ 
+ 	if (copy_to_user((void __user *) (unsigned long) cmd.response,
+ 			 &resp, sizeof resp)) {
+diff --git a/drivers/infiniband/core/verbs.c b/drivers/infiniband/core/verbs.c
+index 17209e7664d2..c5997b21bd63 100644
+--- a/drivers/infiniband/core/verbs.c
++++ b/drivers/infiniband/core/verbs.c
+@@ -253,6 +253,10 @@ struct ib_pd *__ib_alloc_pd(struct ib_device *device, unsigned int flags,
+ 		mr_access_flags |= IB_ACCESS_REMOTE_READ | IB_ACCESS_REMOTE_WRITE;
+ 	}
+ 
++	pd->res.type = RDMA_RESTRACK_PD;
++	pd->res.kern_name = caller;
++	rdma_restrack_add(&pd->res);
++
+ 	if (mr_access_flags) {
+ 		struct ib_mr *mr;
+ 
+@@ -302,6 +306,7 @@ void ib_dealloc_pd(struct ib_pd *pd)
+ 	   requires the caller to guarantee we can't race here. */
+ 	WARN_ON(atomic_read(&pd->usecnt));
+ 
++	rdma_restrack_del(&pd->res);
+ 	/* Making delalloc_pd a void return is a WIP, no driver should return
+ 	   an error here. */
+ 	ret = pd->device->dealloc_pd(pd);
+-- 
+2.9.3
+

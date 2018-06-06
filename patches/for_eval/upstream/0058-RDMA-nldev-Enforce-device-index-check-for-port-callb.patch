@@ -1,0 +1,35 @@
+From 95afce3a8f8a2d3bd4161e31bdfd64c5097f1b57 Mon Sep 17 00:00:00 2001
+From: Leon Romanovsky <leonro@mellanox.com>
+Date: Tue, 31 Oct 2017 20:09:54 +0200
+Subject: [PATCH 058/103] RDMA/nldev: Enforce device index check for port
+ callback
+
+IB device index is nldev's handler and it should be checked always.
+
+Fixes: c3f66f7b0052 ("RDMA/netlink: Implement nldev port doit callback")
+Signed-off-by: Leon Romanovsky <leonro@mellanox.com>
+Acked-by: Doug Ledford <dledford@redhat.com>
+[ Applying directly, since Doug fried his SSD's and is rebuilding  - Linus ]
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+ drivers/infiniband/core/nldev.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/core/nldev.c b/drivers/infiniband/core/nldev.c
+index 0449aa068479..1044833cb969 100644
+--- a/drivers/infiniband/core/nldev.c
++++ b/drivers/infiniband/core/nldev.c
+@@ -136,7 +136,9 @@ static int nldev_get_doit(struct sk_buff *skb, struct nlmsghdr *nlh)
+ 
+ 	err = nlmsg_parse(nlh, 0, tb, RDMA_NLDEV_ATTR_MAX - 1,
+ 			  nldev_policy);
+-	if (err || !tb[RDMA_NLDEV_ATTR_DEV_INDEX])
++	if (err ||
++	    !tb[RDMA_NLDEV_ATTR_DEV_INDEX] ||
++	    !tb[RDMA_NLDEV_ATTR_PORT_INDEX])
+ 		return -EINVAL;
+ 
+ 	index = nla_get_u32(tb[RDMA_NLDEV_ATTR_DEV_INDEX]);
+-- 
+2.9.3
+

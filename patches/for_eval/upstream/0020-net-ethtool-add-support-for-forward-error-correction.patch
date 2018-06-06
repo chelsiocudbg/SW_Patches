@@ -1,8 +1,8 @@
-From cd3443cc9d27621ecb7aad2b95ea2eb35f3800ce Mon Sep 17 00:00:00 2001
+From 3bba7a29d33016bb5c307a19d98c24031897b394 Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Wed, 16 May 2018 12:58:39 +0530
-Subject: [PATCH 20/22] net: ethtool: add support for forward error correction
- modes
+Subject: [PATCH 020/103] net: ethtool: add support for forward error
+ correction modes
 
 commit 1a5f3da20bd966220931239fbd31e6ac6ff42251
 Author: Vidya Sagar Ravipati <vidya.chowdary@gmail.com>
@@ -103,7 +103,7 @@ Date:   Thu Jul 27 16:47:26 2017 -0700
  3 files changed, 85 insertions(+), 3 deletions(-)
 
 diff --git a/include/linux/ethtool.h b/include/linux/ethtool.h
-index fd6391f4..743ba761 100644
+index fd6391f4f2d4..743ba7618d2b 100644
 --- a/include/linux/ethtool.h
 +++ b/include/linux/ethtool.h
 @@ -392,8 +392,10 @@ struct ethtool_ops {
@@ -120,7 +120,7 @@ index fd6391f4..743ba761 100644
  	RH_KABI_RESERVE_P(13)
  	RH_KABI_RESERVE_P(14)
 diff --git a/include/uapi/linux/ethtool.h b/include/uapi/linux/ethtool.h
-index 2fbc2b3a..4018adc1 100644
+index 2fbc2b3a3c26..4018adc10c26 100644
 --- a/include/uapi/linux/ethtool.h
 +++ b/include/uapi/linux/ethtool.h
 @@ -1222,6 +1222,47 @@ struct ethtool_per_queue_op {
@@ -200,7 +200,7 @@ index 2fbc2b3a..4018adc1 100644
  
  #define __ETHTOOL_LINK_MODE_LEGACY_MASK(base_name)	\
 diff --git a/net/core/ethtool.c b/net/core/ethtool.c
-index 81ee23cf..f4c5a367 100644
+index 81ee23cfbf4e..f4c5a367374a 100644
 --- a/net/core/ethtool.c
 +++ b/net/core/ethtool.c
 @@ -2364,6 +2364,33 @@ static int ethtool_set_per_queue(struct net_device *dev, void __user *useraddr)
@@ -259,5 +259,5 @@ index 81ee23cf..f4c5a367 100644
  		rc = -EOPNOTSUPP;
  	}
 -- 
-2.14.1
+2.9.3
 

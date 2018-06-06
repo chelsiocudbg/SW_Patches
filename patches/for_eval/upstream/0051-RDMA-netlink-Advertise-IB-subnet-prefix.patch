@@ -1,0 +1,56 @@
+From 6446e5fc69437064edc14fa6669f6218b240dc33 Mon Sep 17 00:00:00 2001
+From: Leon Romanovsky <leonro@mellanox.com>
+Date: Wed, 28 Jun 2017 15:05:14 +0300
+Subject: [PATCH 051/103] RDMA/netlink: Advertise IB subnet prefix
+
+Add IB subnet prefix to the port properties exported
+by RDMA netlink.
+
+Signed-off-by: Leon Romanovsky <leonro@mellanox.com>
+---
+ drivers/infiniband/core/nldev.c  | 5 +++++
+ include/uapi/rdma/rdma_netlink.h | 5 +++++
+ 2 files changed, 10 insertions(+)
+
+diff --git a/drivers/infiniband/core/nldev.c b/drivers/infiniband/core/nldev.c
+index f25554a6464b..6eee94ef46fe 100644
+--- a/drivers/infiniband/core/nldev.c
++++ b/drivers/infiniband/core/nldev.c
+@@ -44,6 +44,7 @@ static const struct nla_policy nldev_policy[RDMA_NLDEV_ATTR_MAX] = {
+ 					    .len = IB_FW_VERSION_NAME_MAX - 1},
+ 	[RDMA_NLDEV_ATTR_NODE_GUID]	= { .type = NLA_U64 },
+ 	[RDMA_NLDEV_ATTR_SYS_IMAGE_GUID] = { .type = NLA_U64 },
++	[RDMA_NLDEV_ATTR_SUBNET_PREFIX]	= { .type = NLA_U64 },
+ };
+ 
+ static int fill_dev_info(struct sk_buff *msg, struct ib_device *device)
+@@ -97,6 +98,10 @@ static int fill_port_info(struct sk_buff *msg,
+ 	if (nla_put_u64_64bit(msg, RDMA_NLDEV_ATTR_CAP_FLAGS,
+ 			      (u64)attr.port_cap_flags, 0))
+ 		return -EMSGSIZE;
++	if (rdma_protocol_ib(device, port) &&
++	    nla_put_u64_64bit(msg, RDMA_NLDEV_ATTR_SUBNET_PREFIX,
++			      attr.subnet_prefix, 0))
++		return -EMSGSIZE;
+ 
+ 	return 0;
+ }
+diff --git a/include/uapi/rdma/rdma_netlink.h b/include/uapi/rdma/rdma_netlink.h
+index fe3a7429e7a1..481003182a35 100644
+--- a/include/uapi/rdma/rdma_netlink.h
++++ b/include/uapi/rdma/rdma_netlink.h
+@@ -279,6 +279,11 @@ enum rdma_nldev_attr {
+ 	 */
+ 	RDMA_NLDEV_ATTR_SYS_IMAGE_GUID,		/* u64 */
+ 
++	/*
++	 * Subnet prefix (in host byte order)
++	 */
++	RDMA_NLDEV_ATTR_SUBNET_PREFIX,		/* u64 */
++
+ 	RDMA_NLDEV_ATTR_MAX
+ };
+ #endif /* _UAPI_RDMA_NETLINK_H */
+-- 
+2.9.3
+

@@ -1,7 +1,7 @@
-From c1b28eb5f29c48d2500ded34c463b706e7c6ff82 Mon Sep 17 00:00:00 2001
+From 87710e4c3f99109c9e7e0144dd147917d061cff1 Mon Sep 17 00:00:00 2001
 From: Bharat Potnuri <bharat@chelsio.com>
 Date: Fri, 27 Apr 2018 16:41:16 +0530
-Subject: [PATCH 16/16] iw_cxgb4: Atomically flush per QP HW CQEs
+Subject: [PATCH 016/103] iw_cxgb4: Atomically flush per QP HW CQEs
 
 When a CQ is shared by multiple QPs, c4iw_flush_hw_cq() needs to acquire
 corresponding QP lock before moving the CQEs into its corresponding SW

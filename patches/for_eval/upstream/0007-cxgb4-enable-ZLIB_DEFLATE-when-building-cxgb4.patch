@@ -1,7 +1,7 @@
-From e54d0500cf42a14c32bcbbcf945d13c52fb6f61b Mon Sep 17 00:00:00 2001
+From 92c2c5d07f9e8cfe000e6c8ce93f6548f5ebe2ea Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Mon, 2 Apr 2018 17:26:31 +0530
-Subject: [PATCH 07/14] cxgb4: enable ZLIB_DEFLATE when building cxgb4
+Subject: [PATCH 007/103] cxgb4: enable ZLIB_DEFLATE when building cxgb4
 
 commit a1cf9c9ffe652a4f109eb2cd8e69d8fcdb855d00
 Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>

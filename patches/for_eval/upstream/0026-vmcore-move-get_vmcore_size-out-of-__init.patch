@@ -1,7 +1,7 @@
-From 031549b16719d2060644f0f2fc63d757d6234140 Mon Sep 17 00:00:00 2001
+From 3d34eadd51db5862356b3076ae6e4d4793fadf5a Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Tue, 22 May 2018 13:39:58 +0530
-Subject: [PATCH 26/26] vmcore: move get_vmcore_size out of __init
+Subject: [PATCH 026/103] vmcore: move get_vmcore_size out of __init
 
 commit 44c752fe584d8b9f6e0756ecffa8691677471862
 Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
@@ -29,7 +29,7 @@ Date:   Mon May 21 19:07:50 2018 +0530
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/fs/proc/vmcore.c b/fs/proc/vmcore.c
-index 13af94dc..c458e6db 100644
+index 13af94dc161e..c458e6dbb5fe 100644
 --- a/fs/proc/vmcore.c
 +++ b/fs/proc/vmcore.c
 @@ -570,8 +570,8 @@ static struct vmcore* __init get_new_element(void)
@@ -44,5 +44,5 @@ index 13af94dc..c458e6db 100644
  	u64 size;
  	struct vmcore *m;
 -- 
-2.14.1
+2.9.3
 

@@ -1,0 +1,51 @@
+From 5a2071cc676d95858a1f0a455f49e6d9b2fe4b4d Mon Sep 17 00:00:00 2001
+From: Leon Romanovsky <leonro@mellanox.com>
+Date: Wed, 28 Jun 2017 15:49:30 +0300
+Subject: [PATCH 053/103] RDMA/netlink: Export LID mask control (LMC)
+
+Signed-off-by: Leon Romanovsky <leonro@mellanox.com>
+---
+ drivers/infiniband/core/nldev.c  | 3 +++
+ include/uapi/rdma/rdma_netlink.h | 5 +++++
+ 2 files changed, 8 insertions(+)
+
+diff --git a/drivers/infiniband/core/nldev.c b/drivers/infiniband/core/nldev.c
+index 6061c6ee5292..19138aa9826c 100644
+--- a/drivers/infiniband/core/nldev.c
++++ b/drivers/infiniband/core/nldev.c
+@@ -47,6 +47,7 @@ static const struct nla_policy nldev_policy[RDMA_NLDEV_ATTR_MAX] = {
+ 	[RDMA_NLDEV_ATTR_SUBNET_PREFIX]	= { .type = NLA_U64 },
+ 	[RDMA_NLDEV_ATTR_LID]		= { .type = NLA_U32 },
+ 	[RDMA_NLDEV_ATTR_SM_LID]	= { .type = NLA_U32 },
++	[RDMA_NLDEV_ATTR_LMC]		= { .type = NLA_U8 },
+ };
+ 
+ static int fill_dev_info(struct sk_buff *msg, struct ib_device *device)
+@@ -109,6 +110,8 @@ static int fill_port_info(struct sk_buff *msg,
+ 			return -EMSGSIZE;
+ 		if (nla_put_u32(msg, RDMA_NLDEV_ATTR_SM_LID, attr.sm_lid))
+ 			return -EMSGSIZE;
++		if (nla_put_u8(msg, RDMA_NLDEV_ATTR_LMC, attr.lmc))
++			return -EMSGSIZE;
+ 	}
+ 	return 0;
+ }
+diff --git a/include/uapi/rdma/rdma_netlink.h b/include/uapi/rdma/rdma_netlink.h
+index 7d5caaf54126..035706e6b016 100644
+--- a/include/uapi/rdma/rdma_netlink.h
++++ b/include/uapi/rdma/rdma_netlink.h
+@@ -292,6 +292,11 @@ enum rdma_nldev_attr {
+ 	RDMA_NLDEV_ATTR_LID,			/* u32 */
+ 	RDMA_NLDEV_ATTR_SM_LID,			/* u32 */
+ 
++	/*
++	 * LID mask control (LMC)
++	 */
++	RDMA_NLDEV_ATTR_LMC,			/* u8 */
++
+ 	RDMA_NLDEV_ATTR_MAX
+ };
+ #endif /* _UAPI_RDMA_NETLINK_H */
+-- 
+2.9.3
+

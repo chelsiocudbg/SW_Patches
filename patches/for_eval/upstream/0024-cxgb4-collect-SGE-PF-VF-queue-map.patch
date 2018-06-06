@@ -1,7 +1,7 @@
-From 73b2f180e114afec34dca28cdccb5cc4a63292a4 Mon Sep 17 00:00:00 2001
+From 41c28e61131fa47ef3719698ee3fce32aac32f49 Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Mon, 21 May 2018 20:26:48 +0530
-Subject: [PATCH 24/25] cxgb4: collect SGE PF/VF queue map
+Subject: [PATCH 024/103] cxgb4: collect SGE PF/VF queue map
 
 commit 80a95a80d358ded600a517ea0a93fe86b8f8da84
 Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
@@ -21,7 +21,7 @@ Date:   Fri May 18 19:12:53 2018 +0530
  3 files changed, 65 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cudbg_entity.h b/drivers/net/ethernet/chelsio/cxgb4/cudbg_entity.h
-index 740a18ba..c333e256 100644
+index 740a18ba4229..c333e25620a7 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cudbg_entity.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cudbg_entity.h
 @@ -62,6 +62,18 @@ struct cudbg_hw_sched {
@@ -56,7 +56,7 @@ index 740a18ba..c333e256 100644
  	{0x5a04, 0x5a0c, 0x00, 0x20}, /* t5_pcie_pdbg_regs_00_to_20 */
  	{0x5a04, 0x5a0c, 0x21, 0x20}, /* t5_pcie_pdbg_regs_21_to_40 */
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c b/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
-index 9da7f734..0cc4d5c9 100644
+index 9da7f734d872..0cc4d5c9c28d 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
 @@ -1339,16 +1339,39 @@ int cudbg_collect_tp_indirect(struct cudbg_init *pdbg_init,
@@ -130,7 +130,7 @@ index 9da7f734..0cc4d5c9 100644
  }
  
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c
-index 085691eb..8d751efc 100644
+index 085691eb2b95..8d751efcb90e 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c
 @@ -214,7 +214,8 @@ static u32 cxgb4_get_entity_length(struct adapter *adap, u32 entity)
@@ -144,5 +144,5 @@ index 085691eb..8d751efc 100644
  	case CUDBG_ULPRX_LA:
  		len = sizeof(struct cudbg_ulprx_la);
 -- 
-2.14.1
+2.9.3
 

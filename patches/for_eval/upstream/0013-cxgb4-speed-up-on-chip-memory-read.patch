@@ -1,7 +1,7 @@
-From 06353b1ae853a72566236b2eecd6aa1bd4324d01 Mon Sep 17 00:00:00 2001
+From e8db0a922d30db8125f4a7d13fb97b8f54a96b9b Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Mon, 2 Apr 2018 17:28:42 +0530
-Subject: [PATCH 13/14] cxgb4: speed up on-chip memory read
+Subject: [PATCH 013/103] cxgb4: speed up on-chip memory read
 
 commit 7494f980ca0503e3eec6f4ba508186d269b37e7f
 Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>

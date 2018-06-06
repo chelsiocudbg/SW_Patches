@@ -1,7 +1,7 @@
-From d7273fca35a8360951afad7a62f9c8e47b4c796f Mon Sep 17 00:00:00 2001
+From aa43b8bf4245927b0e4b9f357191878b3075b112 Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Mon, 2 Apr 2018 17:28:37 +0530
-Subject: [PATCH 11/14] cxgb4: use backdoor access to collect dumps when
+Subject: [PATCH 011/103] cxgb4: use backdoor access to collect dumps when
  firmware crashed
 
 commit 770ca3477a5bafe4422ead691500d2d99836dc1d

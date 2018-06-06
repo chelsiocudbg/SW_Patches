@@ -1,7 +1,7 @@
-From b0cafe9f60e93f47f89f757305d41ef3ec05a8cc Mon Sep 17 00:00:00 2001
+From 0cd0a0ff4a69ae0587be3edc15326de33a016481 Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Wed, 16 May 2018 14:08:16 +0530
-Subject: [PATCH 22/22] cxgb4: ethtool forward error correction management
+Subject: [PATCH 022/103] cxgb4: ethtool forward error correction management
  support
 
 commit 7fece840e35e52c7114dcf874a72b2c962923800
@@ -17,7 +17,7 @@ Date:   Thu Jul 27 16:47:28 2017 -0700
  1 file changed, 100 insertions(+)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c
-index 2cfec77a..309cc9e3 100644
+index 2cfec77a51fa..309cc9e3116f 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c
 @@ -802,6 +802,104 @@ static int set_link_ksettings(struct net_device *dev,
@@ -135,5 +135,5 @@ index 2cfec77a..309cc9e3 100644
  	.get_msglevel      = get_msglevel,
  	.set_msglevel      = set_msglevel,
 -- 
-2.14.1
+2.9.3
 

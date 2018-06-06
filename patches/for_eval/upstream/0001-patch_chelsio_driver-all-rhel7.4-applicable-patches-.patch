@@ -1,7 +1,7 @@
-From 9a07ef10cc678c836398771e4514fbfb04c275a2 Mon Sep 17 00:00:00 2001
+From 45990e988011354863c7a241112cb50b997df24d Mon Sep 17 00:00:00 2001
 From: Potnuri Bharat Teja <bharat@chelsio.com>
 Date: Tue, 8 May 2018 14:15:39 +0530
-Subject: [PATCH 01/14] patch_chelsio_driver: all rhel7.4 applicable patches
+Subject: [PATCH 001/103] patch_chelsio_driver: all rhel7.4 applicable patches
  upto 0093
 
 This is a single large patch containing all the rhel-7.4 applicable

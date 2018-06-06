@@ -1,7 +1,8 @@
-From efe6baabf3bae8ea836214d98c7cb5a4e459f3dc Mon Sep 17 00:00:00 2001
+From 72e601c0890cbc3a02bb9fa8bd3e0e0c5ba07654 Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Mon, 2 Apr 2018 17:26:19 +0530
-Subject: [PATCH 05/14] cxgb4: update dump collection logic to use compression
+Subject: [PATCH 005/103] cxgb4: update dump collection logic to use
+ compression
 
 commit 56cf2635ce30febd448dc78ff5361e4d9ad2fc0e
 Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>

@@ -1,7 +1,7 @@
-From 5a263ca5bf2c7c0c7a6f7b3f68ae7234420f07ea Mon Sep 17 00:00:00 2001
+From 51aa7e85244b913cf798eeb2f2dbcb636a87262f Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Tue, 15 May 2018 18:59:45 +0530
-Subject: [PATCH 19/22] cxgb4: collect hardware dump in second kernel
+Subject: [PATCH 019/103] cxgb4: collect hardware dump in second kernel
 
 commit 1dde532dd0520a948fbc82f4522183104ee4808b
 Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
@@ -24,7 +24,7 @@ Date:   Wed May 2 15:17:19 2018 +0530
  4 files changed, 41 insertions(+)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-index 4f6a2308..f790a2fc 100644
+index 4f6a23083f9e..f790a2fc60bd 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
 @@ -48,6 +48,7 @@
@@ -45,7 +45,7 @@ index 4f6a2308..f790a2fc 100644
  
  /* Support for "sched-class" command to allow a TX Scheduling Class to be
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c
-index 143686c6..085691eb 100644
+index 143686c60234..085691eb2b95 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.c
 @@ -488,3 +488,28 @@ void cxgb4_init_ethtool_dump(struct adapter *adapter)
@@ -78,7 +78,7 @@ index 143686c6..085691eb 100644
 +	return vmcore_add_device_dump(data);
 +}
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h
-index ce1ac9a1..ef59ba1e 100644
+index ce1ac9a1c878..ef59ba1ed968 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h
 @@ -41,8 +41,11 @@ enum CXGB4_ETHTOOL_DUMP_FLAGS {
@@ -94,7 +94,7 @@ index ce1ac9a1..ef59ba1e 100644
 +int cxgb4_cudbg_vmcore_add_dump(struct adapter *adap);
  #endif /* __CXGB4_CUDBG_H__ */
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index 7467aaf0..0a9fc1a8 100644
+index 7467aaf09175..0a9fc1a88b64 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 @@ -4746,6 +4746,16 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
@@ -115,5 +115,5 @@ index 7467aaf0..0a9fc1a8 100644
  	if (!is_t4(adapter->params.chip)) {
  		s_qpp = (QUEUESPERPAGEPF0_S +
 -- 
-2.14.1
+2.9.3
 

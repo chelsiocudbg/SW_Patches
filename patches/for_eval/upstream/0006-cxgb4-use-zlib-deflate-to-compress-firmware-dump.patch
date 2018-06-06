@@ -1,7 +1,7 @@
-From c2ac7f94e8624a885b4ac8b32c31cef56e11a716 Mon Sep 17 00:00:00 2001
+From 1c3c53859a598cdc4d1ad3cdbd09bb62caaca438 Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Mon, 2 Apr 2018 17:26:25 +0530
-Subject: [PATCH 06/14] cxgb4: use zlib deflate to compress firmware dump
+Subject: [PATCH 006/103] cxgb4: use zlib deflate to compress firmware dump
 
 commit 91c1953de38725d41cf9a677569a8cc280065064
 Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>

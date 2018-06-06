@@ -1,0 +1,139 @@
+From ff8ff8f655bbc4dde9ef54d14663c648c34b1e13 Mon Sep 17 00:00:00 2001
+From: Leon Romanovsky <leonro@mellanox.com>
+Date: Sun, 28 Jan 2018 11:17:22 +0200
+Subject: [PATCH 101/103] RDMA/core: Add resource tracking for create and
+ destroy CQs
+
+Track create and destroy operations of CQ objects.
+
+Reviewed-by: Mark Bloch <markb@mellanox.com>
+Signed-off-by: Leon Romanovsky <leonro@mellanox.com>
+Reviewed-by: Steve Wise <swise@opengridcomputing.com>
+Signed-off-by: Jason Gunthorpe <jgg@mellanox.com>
+---
+ drivers/infiniband/core/cq.c         |  6 ++++++
+ drivers/infiniband/core/uverbs_cmd.c |  4 ++++
+ drivers/infiniband/core/verbs.c      | 11 ++++++++---
+ include/rdma/ib_verbs.h              |  7 +++++--
+ 4 files changed, 23 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/infiniband/core/cq.c b/drivers/infiniband/core/cq.c
+index 88791dc82cb9..b8600c9a934b 100644
+--- a/drivers/infiniband/core/cq.c
++++ b/drivers/infiniband/core/cq.c
+@@ -149,6 +149,10 @@ struct ib_cq *__ib_alloc_cq(struct ib_device *dev, void *private,
+ 	if (!cq->wc)
+ 		goto out_destroy_cq;
+ 
++	cq->res.type = RDMA_RESTRACK_CQ;
++	cq->res.kern_name = caller;
++	rdma_restrack_add(&cq->res);
++
+ 	switch (cq->poll_ctx) {
+ 	case IB_POLL_DIRECT:
+ 		cq->comp_handler = ib_cq_completion_direct;
+@@ -173,6 +177,7 @@ struct ib_cq *__ib_alloc_cq(struct ib_device *dev, void *private,
+ 
+ out_free_wc:
+ 	kfree(cq->wc);
++	rdma_restrack_del(&cq->res);
+ out_destroy_cq:
+ 	cq->device->destroy_cq(cq);
+ 	return ERR_PTR(ret);
+@@ -204,6 +209,7 @@ void ib_free_cq(struct ib_cq *cq)
+ 	}
+ 
+ 	kfree(cq->wc);
++	rdma_restrack_del(&cq->res);
+ 	ret = cq->device->destroy_cq(cq);
+ 	WARN_ON_ONCE(ret);
+ }
+diff --git a/drivers/infiniband/core/uverbs_cmd.c b/drivers/infiniband/core/uverbs_cmd.c
+index 51a729594632..bf6d42004d35 100644
+--- a/drivers/infiniband/core/uverbs_cmd.c
++++ b/drivers/infiniband/core/uverbs_cmd.c
+@@ -1395,6 +1395,7 @@ static struct ib_ucq_object *create_cq(struct ib_uverbs_file *file,
+ 		}
+ 	}
+ 
++	obj->uobject.user_handle = cmd->user_handle;
+ 	obj->uverbs_file	   = file;
+ 	obj->comp_events_reported  = 0;
+ 	obj->async_events_reported = 0;
+@@ -1437,6 +1438,9 @@ static struct ib_ucq_object *create_cq(struct ib_uverbs_file *file,
+ 	if (ret)
+ 		goto err_cb;
+ 
++	cq->res.type = RDMA_RESTRACK_CQ;
++	rdma_restrack_add(&cq->res);
++
+ 	mutex_lock(&file->mutex);
+ 	list_add_tail(&obj->uobject.list, &file->ucontext->cq_list);
+ 	mutex_unlock(&file->mutex);
+diff --git a/drivers/infiniband/core/verbs.c b/drivers/infiniband/core/verbs.c
+index 94ce8f7b2d8a..17209e7664d2 100644
+--- a/drivers/infiniband/core/verbs.c
++++ b/drivers/infiniband/core/verbs.c
+@@ -1362,11 +1362,12 @@ EXPORT_SYMBOL(ib_destroy_qp);
+ 
+ /* Completion queues */
+ 
+-struct ib_cq *ib_create_cq(struct ib_device *device,
++struct ib_cq *__ib_create_cq(struct ib_device *device,
+ 			   ib_comp_handler comp_handler,
+ 			   void (*event_handler)(struct ib_event *, void *),
+ 			   void *cq_context,
+-			   const struct ib_cq_init_attr *cq_attr)
++			   const struct ib_cq_init_attr *cq_attr,
++			   const char *caller)
+ {
+ 	struct ib_cq *cq;
+ 
+@@ -1379,11 +1380,14 @@ struct ib_cq *ib_create_cq(struct ib_device *device,
+ 		cq->event_handler = event_handler;
+ 		cq->cq_context    = cq_context;
+ 		atomic_set(&cq->usecnt, 0);
++		cq->res.type = RDMA_RESTRACK_CQ;
++		cq->res.kern_name = caller;
++		rdma_restrack_add(&cq->res);
+ 	}
+ 
+ 	return cq;
+ }
+-EXPORT_SYMBOL(ib_create_cq);
++EXPORT_SYMBOL(__ib_create_cq);
+ 
+ int rdma_set_cq_moderation(struct ib_cq *cq, u16 cq_count, u16 cq_period)
+ {
+@@ -1397,6 +1401,7 @@ int ib_destroy_cq(struct ib_cq *cq)
+ 	if (atomic_read(&cq->usecnt))
+ 		return -EBUSY;
+ 
++	rdma_restrack_del(&cq->res);
+ 	return cq->device->destroy_cq(cq);
+ }
+ EXPORT_SYMBOL(ib_destroy_cq);
+diff --git a/include/rdma/ib_verbs.h b/include/rdma/ib_verbs.h
+index ab2cc9861402..c8a8191e5f13 100644
+--- a/include/rdma/ib_verbs.h
++++ b/include/rdma/ib_verbs.h
+@@ -2935,11 +2935,14 @@ int ib_process_cq_direct(struct ib_cq *cq, int budget);
+  *
+  * Users can examine the cq structure to determine the actual CQ size.
+  */
+-struct ib_cq *ib_create_cq(struct ib_device *device,
++struct ib_cq *__ib_create_cq(struct ib_device *device,
+ 			   ib_comp_handler comp_handler,
+ 			   void (*event_handler)(struct ib_event *, void *),
+ 			   void *cq_context,
+-			   const struct ib_cq_init_attr *cq_attr);
++			   const struct ib_cq_init_attr *cq_attr,
++			   const char *caller);
++#define ib_create_cq(device, cmp_hndlr, evt_hndlr, cq_ctxt, cq_attr) \
++	__ib_create_cq((device), (cmp_hndlr), (evt_hndlr), (cq_ctxt), (cq_attr), KBUILD_MODNAME)
+ 
+ /**
+  * ib_resize_cq - Modifies the capacity of the CQ.
+-- 
+2.9.3
+

@@ -1,0 +1,62 @@
+From 7a7034ed4d4ec42ec161c4242aa3ee59d0488240 Mon Sep 17 00:00:00 2001
+From: Steve Wise <swise@opengridcomputing.com>
+Date: Wed, 14 Feb 2018 18:43:36 -0800
+Subject: [PATCH 072/103] RDMA/restrack: don't use uaccess_kernel()
+
+uaccess_kernel() isn't sufficient to determine if an rdma resource is
+user-mode or not.  For example, resources allocated in the add_one()
+function of an ib_client get falsely labeled as user mode, when they
+are kernel mode allocations.  EG: mad qps.
+
+The result is that these qps are skipped over during a nldev query
+because of an erroneous namespace mismatch.
+
+So now we determine if the resource is user-mode by looking at the object
+struct's uobject or similar pointer to know if it was allocated for user
+mode applications.
+
+Fixes: 02d8883f520e ("RDMA/restrack: Add general infrastructure to track RDMA resources")
+Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+Signed-off-by: Jason Gunthorpe <jgg@mellanox.com>
+---
+ drivers/infiniband/core/restrack.c | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/core/restrack.c b/drivers/infiniband/core/restrack.c
+index fe372d6bd04f..d1ef61e7e4b3 100644
+--- a/drivers/infiniband/core/restrack.c
++++ b/drivers/infiniband/core/restrack.c
+@@ -87,6 +87,21 @@ static struct ib_device *res_to_dev(struct rdma_restrack_entry *res)
+ 	return dev;
+ }
+ 
++static bool res_is_user(struct rdma_restrack_entry *res)
++{
++	switch (res->type) {
++	case RDMA_RESTRACK_PD:
++		return container_of(res, struct ib_pd, res)->uobject;
++	case RDMA_RESTRACK_CQ:
++		return container_of(res, struct ib_cq, res)->uobject;
++	case RDMA_RESTRACK_QP:
++		return container_of(res, struct ib_qp, res)->uobject;
++	default:
++		WARN_ONCE(true, "Wrong resource tracking type %u\n", res->type);
++		return false;
++	}
++}
++
+ void rdma_restrack_add(struct rdma_restrack_entry *res)
+ {
+ 	struct ib_device *dev = res_to_dev(res);
+@@ -94,7 +109,7 @@ void rdma_restrack_add(struct rdma_restrack_entry *res)
+ 	if (!dev)
+ 		return;
+ 
+-	if (!segment_eq(get_fs(), KERNEL_DS)) {
++	if (res_is_user(res)) {
+ 		get_task_struct(current);
+ 		res->task = current;
+ 		res->kern_name = NULL;
+-- 
+2.9.3
+

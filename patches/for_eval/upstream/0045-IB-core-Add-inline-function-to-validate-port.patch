@@ -1,0 +1,175 @@
+From 535b19c257b07ca11e6f864862fed80f91c23b36 Mon Sep 17 00:00:00 2001
+From: Yuval Shaia <yuval.shaia@oracle.com>
+Date: Wed, 25 Jan 2017 18:41:37 +0200
+Subject: [PATCH 045/103] IB/core: Add inline function to validate port
+
+Signed-off-by: Yuval Shaia <yuval.shaia@oracle.com>
+Reviewed-by: Leon Romanovsky <leonro@mellanox.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/core/cache.c  | 18 ++++++++----------
+ drivers/infiniband/core/cma.c    |  6 ++----
+ drivers/infiniband/core/device.c |  4 ++--
+ drivers/infiniband/core/verbs.c  |  3 +--
+ include/rdma/ib_verbs.h          |  7 +++++++
+ 5 files changed, 20 insertions(+), 18 deletions(-)
+
+diff --git a/drivers/infiniband/core/cache.c b/drivers/infiniband/core/cache.c
+index ae04826e82fc..0718b21f3d9f 100644
+--- a/drivers/infiniband/core/cache.c
++++ b/drivers/infiniband/core/cache.c
+@@ -510,8 +510,7 @@ int ib_find_cached_gid_by_port(struct ib_device *ib_dev,
+ 	struct ib_gid_attr val = {.ndev = ndev, .gid_type = gid_type};
+ 	unsigned long flags;
+ 
+-	if (port < rdma_start_port(ib_dev) ||
+-	    port > rdma_end_port(ib_dev))
++	if (!rdma_is_port_valid(ib_dev, port))
+ 		return -ENOENT;
+ 
+ 	table = ports_table[port - rdma_start_port(ib_dev)];
+@@ -571,8 +570,7 @@ static int ib_cache_gid_find_by_filter(struct ib_device *ib_dev,
+ 	if (!ports_table)
+ 		return -EOPNOTSUPP;
+ 
+-	if (port < rdma_start_port(ib_dev) ||
+-	    port > rdma_end_port(ib_dev) ||
++	if (!rdma_is_port_valid(ib_dev, port) ||
+ 	    !rdma_protocol_roce(ib_dev, port))
+ 		return -EPROTONOSUPPORT;
+ 
+@@ -863,7 +861,7 @@ int ib_get_cached_gid(struct ib_device *device,
+ 	struct ib_gid_table **ports_table = device->cache.gid_cache;
+ 	struct ib_gid_table *table = ports_table[port_num - rdma_start_port(device)];
+ 
+-	if (port_num < rdma_start_port(device) || port_num > rdma_end_port(device))
++	if (!rdma_is_port_valid(device, port_num))
+ 		return -EINVAL;
+ 
+ 	read_lock_irqsave(&table->rwlock, flags);
+@@ -912,7 +910,7 @@ int ib_get_cached_pkey(struct ib_device *device,
+ 	unsigned long flags;
+ 	int ret = 0;
+ 
+-	if (port_num < rdma_start_port(device) || port_num > rdma_end_port(device))
++	if (!rdma_is_port_valid(device, port_num))
+ 		return -EINVAL;
+ 
+ 	read_lock_irqsave(&device->cache.lock, flags);
+@@ -941,7 +939,7 @@ int ib_find_cached_pkey(struct ib_device *device,
+ 	int ret = -ENOENT;
+ 	int partial_ix = -1;
+ 
+-	if (port_num < rdma_start_port(device) || port_num > rdma_end_port(device))
++	if (!rdma_is_port_valid(device, port_num))
+ 		return -EINVAL;
+ 
+ 	read_lock_irqsave(&device->cache.lock, flags);
+@@ -981,7 +979,7 @@ int ib_find_exact_cached_pkey(struct ib_device *device,
+ 	int i;
+ 	int ret = -ENOENT;
+ 
+-	if (port_num < rdma_start_port(device) || port_num > rdma_end_port(device))
++	if (!rdma_is_port_valid(device, port_num))
+ 		return -EINVAL;
+ 
+ 	read_lock_irqsave(&device->cache.lock, flags);
+@@ -1010,7 +1008,7 @@ int ib_get_cached_lmc(struct ib_device *device,
+ 	unsigned long flags;
+ 	int ret = 0;
+ 
+-	if (port_num < rdma_start_port(device) || port_num > rdma_end_port(device))
++	if (!rdma_is_port_valid(device, port_num))
+ 		return -EINVAL;
+ 
+ 	read_lock_irqsave(&device->cache.lock, flags);
+@@ -1037,7 +1035,7 @@ static void ib_cache_update(struct ib_device *device,
+ 	bool			   use_roce_gid_table =
+ 					rdma_cap_roce_gid_table(device, port);
+ 
+-	if (port < rdma_start_port(device) || port > rdma_end_port(device))
++	if (!rdma_is_port_valid(device, port))
+ 		return;
+ 
+ 	table = ports_table[port - rdma_start_port(device)];
+diff --git a/drivers/infiniband/core/cma.c b/drivers/infiniband/core/cma.c
+index 84e085d54647..29a70d70e7b3 100644
+--- a/drivers/infiniband/core/cma.c
++++ b/drivers/infiniband/core/cma.c
+@@ -269,8 +269,7 @@ struct cma_device *cma_enum_devices_by_ibdev(cma_device_filter	filter,
+ int cma_get_default_gid_type(struct cma_device *cma_dev,
+ 			     unsigned int port)
+ {
+-	if (port < rdma_start_port(cma_dev->device) ||
+-	    port > rdma_end_port(cma_dev->device))
++	if (!rdma_is_port_valid(cma_dev->device, port))
+ 		return -EINVAL;
+ 
+ 	return cma_dev->default_gid_type[port - rdma_start_port(cma_dev->device)];
+@@ -282,8 +281,7 @@ int cma_set_default_gid_type(struct cma_device *cma_dev,
+ {
+ 	unsigned long supported_gids;
+ 
+-	if (port < rdma_start_port(cma_dev->device) ||
+-	    port > rdma_end_port(cma_dev->device))
++	if (!rdma_is_port_valid(cma_dev->device, port))
+ 		return -EINVAL;
+ 
+ 	supported_gids = roce_gid_type_mask_support(cma_dev->device, port);
+diff --git a/drivers/infiniband/core/device.c b/drivers/infiniband/core/device.c
+index ca6d5aba78f6..c6ecb8701305 100644
+--- a/drivers/infiniband/core/device.c
++++ b/drivers/infiniband/core/device.c
+@@ -694,7 +694,7 @@ int ib_query_port(struct ib_device *device,
+ 	union ib_gid gid;
+ 	int err;
+ 
+-	if (port_num < rdma_start_port(device) || port_num > rdma_end_port(device))
++	if (!rdma_is_port_valid(device, port_num))
+ 		return -EINVAL;
+ 
+ 	memset(port_attr, 0, sizeof(*port_attr));
+@@ -885,7 +885,7 @@ int ib_modify_port(struct ib_device *device,
+ 	if (!device->modify_port)
+ 		return -ENOSYS;
+ 
+-	if (port_num < rdma_start_port(device) || port_num > rdma_end_port(device))
++	if (!rdma_is_port_valid(device, port_num))
+ 		return -EINVAL;
+ 
+ 	return device->modify_port(device, port_num, port_modify_mask,
+diff --git a/drivers/infiniband/core/verbs.c b/drivers/infiniband/core/verbs.c
+index 71580cc28c9e..9b77fbc86903 100644
+--- a/drivers/infiniband/core/verbs.c
++++ b/drivers/infiniband/core/verbs.c
+@@ -1205,8 +1205,7 @@ int ib_resolve_eth_dmac(struct ib_device *device,
+ {
+ 	int           ret = 0;
+ 
+-	if (ah_attr->port_num < rdma_start_port(device) ||
+-	    ah_attr->port_num > rdma_end_port(device))
++	if (!rdma_is_port_valid(device, ah_attr->port_num))
+ 		return -EINVAL;
+ 
+ 	if (!rdma_cap_eth_ah(device, ah_attr->port_num))
+diff --git a/include/rdma/ib_verbs.h b/include/rdma/ib_verbs.h
+index 2ebe5568100f..cc0255b1abde 100644
+--- a/include/rdma/ib_verbs.h
++++ b/include/rdma/ib_verbs.h
+@@ -2326,6 +2326,13 @@ static inline u8 rdma_end_port(const struct ib_device *device)
+ 	return rdma_cap_ib_switch(device) ? 0 : device->phys_port_cnt;
+ }
+ 
++static inline int rdma_is_port_valid(const struct ib_device *device,
++				     unsigned int port)
++{
++	return (port >= rdma_start_port(device) &&
++		port <= rdma_end_port(device));
++}
++
+ static inline bool rdma_protocol_ib(const struct ib_device *device, u8 port_num)
+ {
+ 	return device->port_immutable[port_num].core_cap_flags & RDMA_CORE_CAP_PROT_IB;
+-- 
+2.9.3
+

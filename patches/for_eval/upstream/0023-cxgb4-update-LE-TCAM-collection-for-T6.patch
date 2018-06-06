@@ -1,7 +1,7 @@
-From f9bdecb1815f9beea9a13a84affbce23078a7904 Mon Sep 17 00:00:00 2001
+From ea009602315f965669d2dc1f24b186c6e9f30c10 Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Mon, 21 May 2018 20:26:15 +0530
-Subject: [PATCH 23/25] cxgb4: update LE-TCAM collection for T6
+Subject: [PATCH 023/103] cxgb4: update LE-TCAM collection for T6
 
 commit 8e725f7caafb8e820e05707fe9853023375438cf
 Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
@@ -27,7 +27,7 @@ Date:   Wed May 16 19:51:15 2018 +0530
  4 files changed, 37 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cudbg_entity.h b/drivers/net/ethernet/chelsio/cxgb4/cudbg_entity.h
-index b57acb8d..740a18ba 100644
+index b57acb8dc35b..740a18ba4229 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cudbg_entity.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cudbg_entity.h
 @@ -235,6 +235,9 @@ struct cudbg_vpd_data {
@@ -41,7 +41,7 @@ index b57acb8d..740a18ba 100644
  enum cudbg_le_entry_types {
  	LE_ET_UNKNOWN = 0,
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cudbg_if.h b/drivers/net/ethernet/chelsio/cxgb4/cudbg_if.h
-index 8568a51f..215fe626 100644
+index 8568a51f6414..215fe6260fd7 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cudbg_if.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cudbg_if.h
 @@ -24,6 +24,7 @@
@@ -53,7 +53,7 @@ index 8568a51f..215fe626 100644
  #define CUDBG_MAJOR_VERSION 1
  #define CUDBG_MINOR_VERSION 14
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c b/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
-index a945fa5f..9da7f734 100644
+index a945fa5f2312..9da7f734d872 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
 @@ -2366,8 +2366,11 @@ void cudbg_fill_le_tcam_info(struct adapter *padap,
@@ -126,7 +126,7 @@ index a945fa5f..9da7f734 100644
  }
  
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h b/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
-index 0c67d563..11b8d3b8 100644
+index 0c67d563931f..11b8d3b845a3 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
 @@ -2942,6 +2942,7 @@
@@ -138,5 +138,5 @@ index 0c67d563..11b8d3b8 100644
  #define T6_LE_DB_HASH_TID_BASE_A 0x19df8
  
 -- 
-2.14.1
+2.9.3
 

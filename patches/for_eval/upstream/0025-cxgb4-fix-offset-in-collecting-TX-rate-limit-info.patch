@@ -1,7 +1,7 @@
-From e996e171976b84fde25291044e64ecddc2696e15 Mon Sep 17 00:00:00 2001
+From ee9cc69bd5f45fe63e89ed0f8c3a3c51c6e47a3e Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Mon, 21 May 2018 20:27:20 +0530
-Subject: [PATCH 25/25] cxgb4: fix offset in collecting TX rate limit info
+Subject: [PATCH 025/103] cxgb4: fix offset in collecting TX rate limit info
 
 commit d775f26b295a0a303f7a73d7da46e04296484fe7
 Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
@@ -24,7 +24,7 @@ Date:   Fri May 18 19:13:37 2018 +0530
  1 file changed, 9 insertions(+), 19 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cudbg_entity.h b/drivers/net/ethernet/chelsio/cxgb4/cudbg_entity.h
-index c333e256..3c505786 100644
+index c333e25620a7..3c5057868ab3 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cudbg_entity.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cudbg_entity.h
 @@ -439,15 +439,15 @@ static const u32 t6_up_cim_reg_array[][IREG_NUM_ELEM + 1] = {
@@ -70,5 +70,5 @@ index c333e256..3c505786 100644
  
  static const u32 t6_hma_ireg_array[][IREG_NUM_ELEM] = {
 -- 
-2.14.1
+2.9.3
 

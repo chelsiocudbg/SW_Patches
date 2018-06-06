@@ -1,7 +1,7 @@
-From 671fba04be1a768987d3f36c431a0a8512d787a6 Mon Sep 17 00:00:00 2001
+From bf20babe357f44ac70e839ea145b28b4bc8be78c Mon Sep 17 00:00:00 2001
 From: Potnuri Bharat Teja <bharat@chelsio.com>
 Date: Mon, 26 Mar 2018 13:00:22 +0530
-Subject: [PATCH 04/14] iw_cxgb4: Add ib_device->get_netdev support
+Subject: [PATCH 004/103] iw_cxgb4: Add ib_device->get_netdev support
 
 commit f215a3d2448ae77253f0b93dcc37114779f51778
 Author: Steve Wise <swise@opengridcomputing.com>

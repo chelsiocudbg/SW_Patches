@@ -1,0 +1,32 @@
+From 20360efff15db59715cfca5e4e604466f6828584 Mon Sep 17 00:00:00 2001
+From: Leon Romanovsky <leonro@mellanox.com>
+Date: Mon, 19 Mar 2018 12:21:43 +0200
+Subject: [PATCH 083/103] RDMA/verbs: Remove restrack entry from XRCD structure
+
+XRCD object is not implemented in the restrack, so lets remove it.
+
+Fixes: 02d8883f520e ("RDMA/restrack: Add general infrastructure to track RDMA resources")
+Signed-off-by: Leon Romanovsky <leonro@mellanox.com>
+Signed-off-by: Jason Gunthorpe <jgg@mellanox.com>
+---
+ include/rdma/ib_verbs.h | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/include/rdma/ib_verbs.h b/include/rdma/ib_verbs.h
+index 3732fcf9b4b9..ab2cc9861402 100644
+--- a/include/rdma/ib_verbs.h
++++ b/include/rdma/ib_verbs.h
+@@ -1428,10 +1428,6 @@ struct ib_xrcd {
+ 
+ 	struct mutex		tgt_qp_mutex;
+ 	struct list_head	tgt_qp_list;
+-	/*
+-	 * Implementation details of the RDMA core, don't use in drivers:
+-	 */
+-	struct rdma_restrack_entry res;
+ };
+ 
+ struct ib_ah {
+-- 
+2.9.3
+

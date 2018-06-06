@@ -1,0 +1,32 @@
+From 9d0c2c834225067366dcb50a1b1a439cdca586d4 Mon Sep 17 00:00:00 2001
+From: Leon Romanovsky <leonro@mellanox.com>
+Date: Sun, 28 Jan 2018 11:17:18 +0200
+Subject: [PATCH 065/103] RDMA/core: Use the MODNAME instead of the function
+ name for pd callers
+
+Each of our modules only allocates a PD in one place, so there isn't any
+loss in detail, while MODNAME is more useful and recognizable as something
+to expose to the user.
+
+Signed-off-by: Leon Romanovsky <leonro@mellanox.com>
+Signed-off-by: Jason Gunthorpe <jgg@mellanox.com>
+---
+ include/rdma/ib_verbs.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/rdma/ib_verbs.h b/include/rdma/ib_verbs.h
+index aecc1d9fd7f3..a0b6bf9b866e 100644
+--- a/include/rdma/ib_verbs.h
++++ b/include/rdma/ib_verbs.h
+@@ -2648,7 +2648,7 @@ enum ib_pd_flags {
+ struct ib_pd *__ib_alloc_pd(struct ib_device *device, unsigned int flags,
+ 		const char *caller);
+ #define ib_alloc_pd(device, flags) \
+-	__ib_alloc_pd((device), (flags), __func__)
++	__ib_alloc_pd((device), (flags), KBUILD_MODNAME)
+ void ib_dealloc_pd(struct ib_pd *pd);
+ 
+ /**
+-- 
+2.9.3
+

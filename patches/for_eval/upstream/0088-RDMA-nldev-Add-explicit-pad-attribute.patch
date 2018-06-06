@@ -1,0 +1,125 @@
+From 433434002d1bbea2ca6b7a42c1c5efd18f015c71 Mon Sep 17 00:00:00 2001
+From: Steve Wise <swise@opengridcomputing.com>
+Date: Thu, 3 May 2018 08:40:49 -0700
+Subject: [PATCH 088/103] RDMA/nldev: Add explicit pad attribute
+
+Add a specific RDMA_NLDEV_ATTR_PAD attribute to be used for 64b
+attribute padding.  To preserve the ABI, make this attribute equal to
+RDMA_NLDEV_ATTR_UNSPEC, which has a value of 0, because that has been
+used up until now as the pad attribute.
+
+Change all the previous use of 0 as the pad with this
+new enum.
+
+Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+Reviewed-by: Leon Romanovsky <leonro@mellanox.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/core/nldev.c  | 26 +++++++++++++++-----------
+ include/uapi/rdma/rdma_netlink.h |  3 +++
+ 2 files changed, 18 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/infiniband/core/nldev.c b/drivers/infiniband/core/nldev.c
+index 6adfbdd5593d..e4009bae6800 100644
+--- a/drivers/infiniband/core/nldev.c
++++ b/drivers/infiniband/core/nldev.c
+@@ -121,7 +121,8 @@ static int fill_dev_info(struct sk_buff *msg, struct ib_device *device)
+ 
+ 	BUILD_BUG_ON(sizeof(device->attrs.device_cap_flags) != sizeof(u64));
+ 	if (nla_put_u64_64bit(msg, RDMA_NLDEV_ATTR_CAP_FLAGS,
+-			      device->attrs.device_cap_flags, 0))
++			      device->attrs.device_cap_flags,
++			      RDMA_NLDEV_ATTR_PAD))
+ 		return -EMSGSIZE;
+ 
+ 	ib_get_device_fw_str(device, fw);
+@@ -130,10 +131,12 @@ static int fill_dev_info(struct sk_buff *msg, struct ib_device *device)
+ 		return -EMSGSIZE;
+ 
+ 	if (nla_put_u64_64bit(msg, RDMA_NLDEV_ATTR_NODE_GUID,
+-			      be64_to_cpu(device->node_guid), 0))
++			      be64_to_cpu(device->node_guid),
++			      RDMA_NLDEV_ATTR_PAD))
+ 		return -EMSGSIZE;
+ 	if (nla_put_u64_64bit(msg, RDMA_NLDEV_ATTR_SYS_IMAGE_GUID,
+-			      be64_to_cpu(device->attrs.sys_image_guid), 0))
++			      be64_to_cpu(device->attrs.sys_image_guid),
++			      RDMA_NLDEV_ATTR_PAD))
+ 		return -EMSGSIZE;
+ 	if (nla_put_u8(msg, RDMA_NLDEV_ATTR_DEV_NODE_TYPE, device->node_type))
+ 		return -EMSGSIZE;
+@@ -160,11 +163,11 @@ static int fill_port_info(struct sk_buff *msg,
+ 
+ 	BUILD_BUG_ON(sizeof(attr.port_cap_flags) > sizeof(u64));
+ 	if (nla_put_u64_64bit(msg, RDMA_NLDEV_ATTR_CAP_FLAGS,
+-			      (u64)attr.port_cap_flags, 0))
++			      (u64)attr.port_cap_flags, RDMA_NLDEV_ATTR_PAD))
+ 		return -EMSGSIZE;
+ 	if (rdma_protocol_ib(device, port) &&
+ 	    nla_put_u64_64bit(msg, RDMA_NLDEV_ATTR_SUBNET_PREFIX,
+-			      attr.subnet_prefix, 0))
++			      attr.subnet_prefix, RDMA_NLDEV_ATTR_PAD))
+ 		return -EMSGSIZE;
+ 	if (rdma_protocol_ib(device, port)) {
+ 		if (nla_put_u32(msg, RDMA_NLDEV_ATTR_LID, attr.lid))
+@@ -208,8 +211,8 @@ static int fill_res_info_entry(struct sk_buff *msg,
+ 
+ 	if (nla_put_string(msg, RDMA_NLDEV_ATTR_RES_SUMMARY_ENTRY_NAME, name))
+ 		goto err;
+-	if (nla_put_u64_64bit(msg,
+-			      RDMA_NLDEV_ATTR_RES_SUMMARY_ENTRY_CURR, curr, 0))
++	if (nla_put_u64_64bit(msg, RDMA_NLDEV_ATTR_RES_SUMMARY_ENTRY_CURR, curr,
++			      RDMA_NLDEV_ATTR_PAD))
+ 		goto err;
+ 
+ 	nla_nest_end(msg, entry_attr);
+@@ -408,7 +411,7 @@ static int fill_res_cq_entry(struct sk_buff *msg, struct netlink_callback *cb,
+ 	if (nla_put_u32(msg, RDMA_NLDEV_ATTR_RES_CQE, cq->cqe))
+ 		goto err;
+ 	if (nla_put_u64_64bit(msg, RDMA_NLDEV_ATTR_RES_USECNT,
+-			      atomic_read(&cq->usecnt), 0))
++			      atomic_read(&cq->usecnt), RDMA_NLDEV_ATTR_PAD))
+ 		goto err;
+ 
+ 	/* Poll context is only valid for kernel CQs */
+@@ -444,11 +447,12 @@ static int fill_res_mr_entry(struct sk_buff *msg, struct netlink_callback *cb,
+ 		if (nla_put_u32(msg, RDMA_NLDEV_ATTR_RES_LKEY, mr->lkey))
+ 			goto err;
+ 		if (nla_put_u64_64bit(msg, RDMA_NLDEV_ATTR_RES_IOVA,
+-				      mr->iova, 0))
++				      mr->iova, RDMA_NLDEV_ATTR_PAD))
+ 			goto err;
+ 	}
+ 
+-	if (nla_put_u64_64bit(msg, RDMA_NLDEV_ATTR_RES_MRLEN, mr->length, 0))
++	if (nla_put_u64_64bit(msg, RDMA_NLDEV_ATTR_RES_MRLEN, mr->length,
++			      RDMA_NLDEV_ATTR_PAD))
+ 		goto err;
+ 
+ 	if (fill_res_name_pid(msg, res))
+@@ -483,7 +487,7 @@ static int fill_res_pd_entry(struct sk_buff *msg, struct netlink_callback *cb,
+ 			goto err;
+ 	}
+ 	if (nla_put_u64_64bit(msg, RDMA_NLDEV_ATTR_RES_USECNT,
+-			      atomic_read(&pd->usecnt), 0))
++			      atomic_read(&pd->usecnt), RDMA_NLDEV_ATTR_PAD))
+ 		goto err;
+ 	if ((pd->flags & IB_PD_UNSAFE_GLOBAL_RKEY) &&
+ 	    nla_put_u32(msg, RDMA_NLDEV_ATTR_RES_UNSAFE_GLOBAL_RKEY,
+diff --git a/include/uapi/rdma/rdma_netlink.h b/include/uapi/rdma/rdma_netlink.h
+index e3fc89f18f22..dde3fe703cd6 100644
+--- a/include/uapi/rdma/rdma_netlink.h
++++ b/include/uapi/rdma/rdma_netlink.h
+@@ -252,6 +252,9 @@ enum rdma_nldev_attr {
+ 	/* don't change the order or add anything between, this is ABI! */
+ 	RDMA_NLDEV_ATTR_UNSPEC,
+ 
++	/* Pad attribute for 64b alignment */
++	RDMA_NLDEV_ATTR_PAD = RDMA_NLDEV_ATTR_UNSPEC,
++
+ 	/* Identifier for ib_device */
+ 	RDMA_NLDEV_ATTR_DEV_INDEX,		/* u32 */
+ 
+-- 
+2.9.3
+

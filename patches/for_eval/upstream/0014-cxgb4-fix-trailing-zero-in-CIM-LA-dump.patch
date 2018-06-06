@@ -1,7 +1,7 @@
-From 7cd197788aed2f691ee346f5e9f1c3c3cf46a450 Mon Sep 17 00:00:00 2001
+From 57f436ec369d01b75632c959a12fb5546a326b0a Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Mon, 2 Apr 2018 17:28:45 +0530
-Subject: [PATCH 14/14] cxgb4: fix trailing zero in CIM LA dump
+Subject: [PATCH 014/103] cxgb4: fix trailing zero in CIM LA dump
 
 commit e6f02a4d57cc438099bc8abfba43ba1400d77b38
 Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>

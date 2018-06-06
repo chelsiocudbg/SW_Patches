@@ -1,7 +1,7 @@
-From 59f07df6623a23c182a5fe4249529aa4faaaf03d Mon Sep 17 00:00:00 2001
+From 4bfb247eff1676b82afcfc5eb3f6265844a3877a Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Tue, 15 May 2018 18:49:29 +0530
-Subject: [PATCH 17/22] vmcore: add API to collect hardware dump in second
+Subject: [PATCH 017/103] vmcore: add API to collect hardware dump in second
  kernel
 
 commit 2724273e8fd00b512596a77ee063f49b25f36507
@@ -47,7 +47,7 @@ Date:   Wed May 2 15:17:17 2018 +0530
  create mode 100644 include/uapi/linux/vmcore.h
 
 diff --git a/fs/proc/Kconfig b/fs/proc/Kconfig
-index 15af6222..072e4841 100644
+index 15af6222f8a4..072e4841e70f 100644
 --- a/fs/proc/Kconfig
 +++ b/fs/proc/Kconfig
 @@ -39,6 +39,21 @@ config PROC_VMCORE
@@ -73,7 +73,7 @@ index 15af6222..072e4841 100644
  	bool "Sysctl support (/proc/sys)" if EXPERT
  	depends on PROC_FS
 diff --git a/fs/proc/vmcore.c b/fs/proc/vmcore.c
-index 662a93a8..160b9a65 100644
+index 662a93a80c88..160b9a6576c1 100644
 --- a/fs/proc/vmcore.c
 +++ b/fs/proc/vmcore.c
 @@ -20,6 +20,7 @@
@@ -270,7 +270,7 @@ index 662a93a8..160b9a65 100644
  }
  EXPORT_SYMBOL_GPL(vmcore_cleanup);
 diff --git a/include/linux/crash_dump.h b/include/linux/crash_dump.h
-index fe68a5a9..ddf2c997 100644
+index fe68a5a98583..ddf2c9971be5 100644
 --- a/include/linux/crash_dump.h
 +++ b/include/linux/crash_dump.h
 @@ -5,6 +5,7 @@
@@ -304,7 +304,7 @@ index fe68a5a9..ddf2c997 100644
 +#endif /* CONFIG_PROC_VMCORE_DEVICE_DUMP */
  #endif /* LINUX_CRASHDUMP_H */
 diff --git a/include/linux/kcore.h b/include/linux/kcore.h
-index d9276228..c1f1213f 100644
+index d92762286645..c1f1213f8e75 100644
 --- a/include/linux/kcore.h
 +++ b/include/linux/kcore.h
 @@ -26,6 +26,12 @@ struct vmcore {
@@ -321,7 +321,7 @@ index d9276228..c1f1213f 100644
  extern void kclist_add(struct kcore_list *, void *, size_t, int type);
  #else
 diff --git a/include/uapi/linux/elf.h b/include/uapi/linux/elf.h
-index 0d8d5e02..108f6dcb 100644
+index 0d8d5e022e25..108f6dcb0112 100644
 --- a/include/uapi/linux/elf.h
 +++ b/include/uapi/linux/elf.h
 @@ -413,6 +413,7 @@ typedef struct elf64_shdr {
@@ -334,7 +334,7 @@ index 0d8d5e02..108f6dcb 100644
  /* Note header in a PT_NOTE section */
 diff --git a/include/uapi/linux/vmcore.h b/include/uapi/linux/vmcore.h
 new file mode 100644
-index 00000000..02261966
+index 000000000000..022619668e0e
 --- /dev/null
 +++ b/include/uapi/linux/vmcore.h
 @@ -0,0 +1,18 @@
@@ -357,5 +357,5 @@ index 00000000..02261966
 +
 +#endif /* _UAPI_VMCORE_H */
 -- 
-2.14.1
+2.9.3
 

@@ -1,7 +1,7 @@
-From f9035c8f31f5827812adbd4c48b478612c89a391 Mon Sep 17 00:00:00 2001
+From 123b933f78d929080cfcb7624f0caced6cf6f4cc Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Mon, 2 Apr 2018 17:28:32 +0530
-Subject: [PATCH 09/14] cxgb4: reset FW_OK flag on firmware crash
+Subject: [PATCH 009/103] cxgb4: reset FW_OK flag on firmware crash
 
 commit 825b2b6fd949b0042f3793daafa59b742c9e9d7a
 Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>

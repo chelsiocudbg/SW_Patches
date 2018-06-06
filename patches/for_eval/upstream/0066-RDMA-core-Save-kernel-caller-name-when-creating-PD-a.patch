@@ -1,0 +1,110 @@
+From d2212fb69d0bdfb889a4c5f15e5ba3aadbbb94aa Mon Sep 17 00:00:00 2001
+From: Leon Romanovsky <leonro@mellanox.com>
+Date: Sun, 28 Jan 2018 11:17:19 +0200
+Subject: [PATCH 066/103] RDMA/core: Save kernel caller name when creating PD
+ and CQ objects
+
+The KBUILD_MODNAME variable contains the module name and it is known for
+kernel users during compilation, so let's reuse it to track the owners.
+
+Followup patches will store this for resource tracking.
+
+Signed-off-by: Leon Romanovsky <leonro@mellanox.com>
+Signed-off-by: Jason Gunthorpe <jgg@mellanox.com>
+---
+ drivers/infiniband/core/cq.c    |  9 +++++----
+ drivers/infiniband/core/verbs.c |  4 ++--
+ include/rdma/ib_verbs.h         | 13 ++++++++++---
+ 3 files changed, 17 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/infiniband/core/cq.c b/drivers/infiniband/core/cq.c
+index a754fc727de5..88791dc82cb9 100644
+--- a/drivers/infiniband/core/cq.c
++++ b/drivers/infiniband/core/cq.c
+@@ -111,7 +111,7 @@ static void ib_cq_completion_workqueue(struct ib_cq *cq, void *private)
+ }
+ 
+ /**
+- * ib_alloc_cq - allocate a completion queue
++ * __ib_alloc_cq - allocate a completion queue
+  * @dev:		device to allocate the CQ for
+  * @private:		driver private data, accessible from cq->cq_context
+  * @nr_cqe:		number of CQEs to allocate
+@@ -123,8 +123,9 @@ static void ib_cq_completion_workqueue(struct ib_cq *cq, void *private)
+  * specified context.  The ULP needs must use wr->wr_cqe instead of wr->wr_id
+  * to use this CQ abstraction.
+  */
+-struct ib_cq *ib_alloc_cq(struct ib_device *dev, void *private,
+-		int nr_cqe, int comp_vector, enum ib_poll_context poll_ctx)
++struct ib_cq *__ib_alloc_cq(struct ib_device *dev, void *private,
++		int nr_cqe, int comp_vector,
++		enum ib_poll_context poll_ctx, const char *caller)
+ {
+ 	struct ib_cq_init_attr cq_attr = {
+ 		.cqe		= nr_cqe,
+@@ -176,7 +177,7 @@ out_destroy_cq:
+ 	cq->device->destroy_cq(cq);
+ 	return ERR_PTR(ret);
+ }
+-EXPORT_SYMBOL(ib_alloc_cq);
++EXPORT_SYMBOL(__ib_alloc_cq);
+ 
+ /**
+  * ib_free_cq - free a completion queue
+diff --git a/drivers/infiniband/core/verbs.c b/drivers/infiniband/core/verbs.c
+index 2b1c3c00ea0b..ff768e02b1b7 100644
+--- a/drivers/infiniband/core/verbs.c
++++ b/drivers/infiniband/core/verbs.c
+@@ -1545,7 +1545,7 @@ int ib_detach_mcast(struct ib_qp *qp, union ib_gid *gid, u16 lid)
+ }
+ EXPORT_SYMBOL(ib_detach_mcast);
+ 
+-struct ib_xrcd *ib_alloc_xrcd(struct ib_device *device)
++struct ib_xrcd *__ib_alloc_xrcd(struct ib_device *device, const char *caller)
+ {
+ 	struct ib_xrcd *xrcd;
+ 
+@@ -1563,7 +1563,7 @@ struct ib_xrcd *ib_alloc_xrcd(struct ib_device *device)
+ 
+ 	return xrcd;
+ }
+-EXPORT_SYMBOL(ib_alloc_xrcd);
++EXPORT_SYMBOL(__ib_alloc_xrcd);
+ 
+ int ib_dealloc_xrcd(struct ib_xrcd *xrcd)
+ {
+diff --git a/include/rdma/ib_verbs.h b/include/rdma/ib_verbs.h
+index a0b6bf9b866e..e40fd18f555c 100644
+--- a/include/rdma/ib_verbs.h
++++ b/include/rdma/ib_verbs.h
+@@ -2894,8 +2894,12 @@ static inline int ib_post_recv(struct ib_qp *qp,
+ 	return qp->device->post_recv(qp, recv_wr, bad_recv_wr);
+ }
+ 
+-struct ib_cq *ib_alloc_cq(struct ib_device *dev, void *private,
+-		int nr_cqe, int comp_vector, enum ib_poll_context poll_ctx);
++struct ib_cq *__ib_alloc_cq(struct ib_device *dev, void *private,
++			    int nr_cqe, int comp_vector,
++			    enum ib_poll_context poll_ctx, const char *caller);
++#define ib_alloc_cq(device, priv, nr_cqe, comp_vect, poll_ctx) \
++	__ib_alloc_cq((device), (priv), (nr_cqe), (comp_vect), (poll_ctx), KBUILD_MODNAME)
++
+ void ib_free_cq(struct ib_cq *cq);
+ int ib_process_cq_direct(struct ib_cq *cq, int budget);
+ 
+@@ -3381,8 +3385,11 @@ int ib_detach_mcast(struct ib_qp *qp, union ib_gid *gid, u16 lid);
+ /**
+  * ib_alloc_xrcd - Allocates an XRC domain.
+  * @device: The device on which to allocate the XRC domain.
++ * @caller: Module name for kernel consumers
+  */
+-struct ib_xrcd *ib_alloc_xrcd(struct ib_device *device);
++struct ib_xrcd *__ib_alloc_xrcd(struct ib_device *device, const char *caller);
++#define ib_alloc_xrcd(device) \
++	__ib_alloc_xrcd((device), KBUILD_MODNAME)
+ 
+ /**
+  * ib_dealloc_xrcd - Deallocates an XRC domain.
+-- 
+2.9.3
+

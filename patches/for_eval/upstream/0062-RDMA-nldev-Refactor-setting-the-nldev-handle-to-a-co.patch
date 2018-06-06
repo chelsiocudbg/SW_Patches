@@ -1,0 +1,64 @@
+From 5a59d9699ea5304755fd62596a1391571c843a5e Mon Sep 17 00:00:00 2001
+From: Leon Romanovsky <leonro@mellanox.com>
+Date: Mon, 1 Jan 2018 13:07:14 +0200
+Subject: [PATCH 062/103] RDMA/nldev: Refactor setting the nldev handle to a
+ common function
+
+The NLDEV commands are using IB device indexes and names as a handle
+for netlink communications. Put all relevant code into one function
+to remove code duplication in followup patches.
+
+Reviewed-by: Mark Bloch <markb@mellanox.com>
+Signed-off-by: Leon Romanovsky <leonro@mellanox.com>
+Signed-off-by: Jason Gunthorpe <jgg@mellanox.com>
+---
+ drivers/infiniband/core/nldev.c | 20 ++++++++++++++------
+ 1 file changed, 14 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/infiniband/core/nldev.c b/drivers/infiniband/core/nldev.c
+index 2d73b27f3b2f..1280490fe93b 100644
+--- a/drivers/infiniband/core/nldev.c
++++ b/drivers/infiniband/core/nldev.c
+@@ -53,14 +53,23 @@ static const struct nla_policy nldev_policy[RDMA_NLDEV_ATTR_MAX] = {
+ 	[RDMA_NLDEV_ATTR_DEV_NODE_TYPE] = { .type = NLA_U8 },
+ };
+ 
+-static int fill_dev_info(struct sk_buff *msg, struct ib_device *device)
++static int fill_nldev_handle(struct sk_buff *msg, struct ib_device *device)
+ {
+-	char fw[IB_FW_VERSION_NAME_MAX];
+-
+ 	if (nla_put_u32(msg, RDMA_NLDEV_ATTR_DEV_INDEX, device->index))
+ 		return -EMSGSIZE;
+ 	if (nla_put_string(msg, RDMA_NLDEV_ATTR_DEV_NAME, device->name))
+ 		return -EMSGSIZE;
++
++	return 0;
++}
++
++static int fill_dev_info(struct sk_buff *msg, struct ib_device *device)
++{
++	char fw[IB_FW_VERSION_NAME_MAX];
++
++	if (fill_nldev_handle(msg, device))
++		return -EMSGSIZE;
++
+ 	if (nla_put_u32(msg, RDMA_NLDEV_ATTR_PORT_INDEX, rdma_end_port(device)))
+ 		return -EMSGSIZE;
+ 
+@@ -91,10 +100,9 @@ static int fill_port_info(struct sk_buff *msg,
+ 	struct ib_port_attr attr;
+ 	int ret;
+ 
+-	if (nla_put_u32(msg, RDMA_NLDEV_ATTR_DEV_INDEX, device->index))
+-		return -EMSGSIZE;
+-	if (nla_put_string(msg, RDMA_NLDEV_ATTR_DEV_NAME, device->name))
++	if (fill_nldev_handle(msg, device))
+ 		return -EMSGSIZE;
++
+ 	if (nla_put_u32(msg, RDMA_NLDEV_ATTR_PORT_INDEX, port))
+ 		return -EMSGSIZE;
+ 
+-- 
+2.9.3
+

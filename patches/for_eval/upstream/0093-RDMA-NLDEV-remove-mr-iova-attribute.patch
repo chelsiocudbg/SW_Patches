@@ -1,0 +1,31 @@
+From 52c19e40041018095cb526e1d44ee4cdb6404706 Mon Sep 17 00:00:00 2001
+From: Steve Wise <swise@opengridcomputing.com>
+Date: Tue, 15 May 2018 11:19:30 -0700
+Subject: [PATCH 093/103] RDMA/NLDEV: remove mr iova attribute
+
+Remove mr iova attribute because we don't want to pass up kernel pointers.
+
+Fixes: fccec5b89ac6 ("RDMA/nldev: provide detailed MR information")
+Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+Signed-off-by: Jason Gunthorpe <jgg@mellanox.com>
+---
+ drivers/infiniband/core/nldev.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/drivers/infiniband/core/nldev.c b/drivers/infiniband/core/nldev.c
+index 1edfd666d9d6..b9a82340c82b 100644
+--- a/drivers/infiniband/core/nldev.c
++++ b/drivers/infiniband/core/nldev.c
+@@ -534,9 +534,6 @@ static int fill_res_mr_entry(struct sk_buff *msg, struct netlink_callback *cb,
+ 			goto err;
+ 		if (nla_put_u32(msg, RDMA_NLDEV_ATTR_RES_LKEY, mr->lkey))
+ 			goto err;
+-		if (nla_put_u64_64bit(msg, RDMA_NLDEV_ATTR_RES_IOVA,
+-				      mr->iova, RDMA_NLDEV_ATTR_PAD))
+-			goto err;
+ 	}
+ 
+ 	if (nla_put_u64_64bit(msg, RDMA_NLDEV_ATTR_RES_MRLEN, mr->length,
+-- 
+2.9.3
+

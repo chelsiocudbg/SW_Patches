@@ -1,7 +1,7 @@
-From 97ce9c55472bd0f3381c3f46b15799071906c070 Mon Sep 17 00:00:00 2001
+From 38692efd464c20f7fb1ad4f874c94a85c1e58cfe Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Mon, 2 Apr 2018 17:26:37 +0530
-Subject: [PATCH 08/14] cxgb4: properly initialize variables
+Subject: [PATCH 008/103] cxgb4: properly initialize variables
 
 commit 325694e6c3484959d066d5c0e9bff4c5966491a3
 Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>

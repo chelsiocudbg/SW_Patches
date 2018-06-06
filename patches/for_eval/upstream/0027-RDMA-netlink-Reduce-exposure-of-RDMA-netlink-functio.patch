@@ -1,0 +1,93 @@
+From c8ad67b218058c5b1172594842bf5443f82ece77 Mon Sep 17 00:00:00 2001
+From: Leon Romanovsky <leonro@mellanox.com>
+Date: Sun, 14 May 2017 15:49:57 +0300
+Subject: [PATCH 027/103] RDMA/netlink: Reduce exposure of RDMA netlink
+ functions
+
+RDMA netlink is part of ib_core, hence ibnl_chk_listeners(),
+ibnl_init() and ibnl_cleanup() don't need to be published
+in public header file.
+
+Let's remove EXPORT_SYMBOL from ibnl_chk_listeners() and move all these
+functions to private header file.
+
+CC: Yuval Shaia <yuval.shaia@oracle.com>
+Signed-off-by: Leon Romanovsky <leonro@mellanox.com>
+Reviewed-by: Yuval Shaia <yuval.shaia@oracle.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/core/core_priv.h | 10 ++++++++++
+ drivers/infiniband/core/netlink.c   |  2 +-
+ include/rdma/rdma_netlink.h         | 10 ----------
+ 3 files changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/infiniband/core/core_priv.h b/drivers/infiniband/core/core_priv.h
+index d29372624f3a..2863f68def82 100644
+--- a/drivers/infiniband/core/core_priv.h
++++ b/drivers/infiniband/core/core_priv.h
+@@ -136,6 +136,16 @@ void ib_mad_cleanup(void);
+ int ib_sa_init(void);
+ void ib_sa_cleanup(void);
+ 
++int ibnl_init(void);
++void ibnl_cleanup(void);
++
++/**
++ * Check if there are any listeners to the netlink group
++ * @group: the netlink group ID
++ * Returns 0 on success or a negative for no listeners.
++ */
++int ibnl_chk_listeners(unsigned int group);
++
+ int ib_nl_handle_resolve_resp(struct sk_buff *skb,
+ 			      struct netlink_callback *cb);
+ int ib_nl_handle_set_timeout(struct sk_buff *skb,
+diff --git a/drivers/infiniband/core/netlink.c b/drivers/infiniband/core/netlink.c
+index 10469b0088b5..de90f5307ac7 100644
+--- a/drivers/infiniband/core/netlink.c
++++ b/drivers/infiniband/core/netlink.c
+@@ -37,6 +37,7 @@
+ #include <net/net_namespace.h>
+ #include <net/sock.h>
+ #include <rdma/rdma_netlink.h>
++#include "core_priv.h"
+ 
+ struct ibnl_client {
+ 	struct list_head		list;
+@@ -55,7 +56,6 @@ int ibnl_chk_listeners(unsigned int group)
+ 		return -1;
+ 	return 0;
+ }
+-EXPORT_SYMBOL(ibnl_chk_listeners);
+ 
+ int ibnl_add_client(int index, int nops,
+ 		    const struct ibnl_client_cbs cb_table[])
+diff --git a/include/rdma/rdma_netlink.h b/include/rdma/rdma_netlink.h
+index 585266144329..348c102cb5f6 100644
+--- a/include/rdma/rdma_netlink.h
++++ b/include/rdma/rdma_netlink.h
+@@ -10,9 +10,6 @@ struct ibnl_client_cbs {
+ 	struct module *module;
+ };
+ 
+-int ibnl_init(void);
+-void ibnl_cleanup(void);
+-
+ /**
+  * Add a a client to the list of IB netlink exporters.
+  * @index: Index of the added client
+@@ -77,11 +74,4 @@ int ibnl_unicast(struct sk_buff *skb, struct nlmsghdr *nlh,
+ int ibnl_multicast(struct sk_buff *skb, struct nlmsghdr *nlh,
+ 			unsigned int group, gfp_t flags);
+ 
+-/**
+- * Check if there are any listeners to the netlink group
+- * @group: the netlink group ID
+- * Returns 0 on success or a negative for no listeners.
+- */
+-int ibnl_chk_listeners(unsigned int group);
+-
+ #endif /* _RDMA_NETLINK_H */
+-- 
+2.9.3
+

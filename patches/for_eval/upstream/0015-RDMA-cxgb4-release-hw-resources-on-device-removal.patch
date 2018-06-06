@@ -1,7 +1,7 @@
-From db41e67c13adb8042c0eb526f077f6c9e60b0dca Mon Sep 17 00:00:00 2001
+From a98f5c726c26fbfd043648ceead61a1acf54512b Mon Sep 17 00:00:00 2001
 From: Raju Rangoju <rajur@chelsio.com>
 Date: Mon, 23 Apr 2018 21:42:37 +0530
-Subject: [PATCH 15/16] RDMA/cxgb4: release hw resources on device removal
+Subject: [PATCH 015/103] RDMA/cxgb4: release hw resources on device removal
 
 The c4iw_rdev_close() logic was not releasing all the hw
 resources (PBL and RQT memory) during the device removal

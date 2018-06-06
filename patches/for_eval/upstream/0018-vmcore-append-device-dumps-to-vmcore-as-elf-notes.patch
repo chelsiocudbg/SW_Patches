@@ -1,7 +1,7 @@
-From d7042f3f4b52c7dbe6f2f180469e4b28c281af2c Mon Sep 17 00:00:00 2001
+From 0e0cefbbc170bfbca333e90eca25dd0f2daa2194 Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Tue, 15 May 2018 18:58:12 +0530
-Subject: [PATCH 18/22] vmcore: append device dumps to vmcore as elf notes
+Subject: [PATCH 018/103] vmcore: append device dumps to vmcore as elf notes
 
 commit 7efe48df8a3df6d089d2e9a1d429c82cc5dcf2de
 Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
@@ -31,7 +31,7 @@ Date:   Wed May 2 15:17:18 2018 +0530
  1 file changed, 243 insertions(+), 4 deletions(-)
 
 diff --git a/fs/proc/vmcore.c b/fs/proc/vmcore.c
-index 160b9a65..13af94dc 100644
+index 160b9a6576c1..13af94dc161e 100644
 --- a/fs/proc/vmcore.c
 +++ b/fs/proc/vmcore.c
 @@ -39,6 +39,8 @@ static size_t elfcorebuf_sz_orig;
@@ -257,11 +257,10 @@ index 160b9a65..13af94dc 100644
  {
  	loff_t vmcore_off;
  	struct vmcore *m;
-@@ -1095,6 +1247,92 @@ static void vmcoredd_write_header(void *buf, struct vmcoredd_data *data,
- 	memcpy(vdd_hdr->dump_name, data->dump_name, sizeof(vdd_hdr->dump_name));
+@@ -1096,6 +1248,92 @@ static void vmcoredd_write_header(void *buf, struct vmcoredd_data *data,
  }
  
-+/**
+ /**
 + * vmcoredd_update_program_headers - Update all Elf program headers
 + * @elfptr: Pointer to elf header
 + * @elfnotesz: Size of elf notes aligned to page size
@@ -347,9 +346,10 @@ index 160b9a65..13af94dc 100644
 +	proc_vmcore->size = vmcore_size;
 +}
 +
- /**
++/**
   * vmcore_add_device_dump - Add a buffer containing device dump to vmcore
   * @data: dump info.
+  *
 @@ -1148,6 +1386,7 @@ int vmcore_add_device_dump(struct vmcoredd_data *data)
  	list_add_tail(&dump->list, &vmcoredd_list);
  	mutex_unlock(&vmcoredd_mutex);
@@ -359,5 +359,5 @@ index 160b9a65..13af94dc 100644
  
  out_err:
 -- 
-2.14.1
+2.9.3
 

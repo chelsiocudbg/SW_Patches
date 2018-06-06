@@ -1,0 +1,43 @@
+From 7eda32b8d235d59dfd4f0944c10ff6d7f42a39bf Mon Sep 17 00:00:00 2001
+From: Leon Romanovsky <leonro@mellanox.com>
+Date: Wed, 14 Feb 2018 12:35:37 +0200
+Subject: [PATCH 103/103] RDMA/restrack: Increment CQ restrack object before
+ committing
+
+Once the uobj is committed it is immediately possible another thread
+could destroy it, which worst case, can result in a use-after-free
+of the restrack objects.
+
+Cc: syzkaller <syzkaller@googlegroups.com>
+Fixes: 08f294a1524b ("RDMA/core: Add resource tracking for create and destroy CQs")
+Reported-by: Noa Osherovich <noaos@mellanox.com>
+Signed-off-by: Leon Romanovsky <leonro@mellanox.com>
+Signed-off-by: Jason Gunthorpe <jgg@mellanox.com>
+---
+ drivers/infiniband/core/uverbs_cmd.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/infiniband/core/uverbs_cmd.c b/drivers/infiniband/core/uverbs_cmd.c
+index e744d4a58a3c..ffa217abfe9e 100644
+--- a/drivers/infiniband/core/uverbs_cmd.c
++++ b/drivers/infiniband/core/uverbs_cmd.c
+@@ -1436,13 +1436,13 @@ static struct ib_ucq_object *create_cq(struct ib_uverbs_file *file,
+ 	resp.response_length = offsetof(typeof(resp), response_length) +
+ 		sizeof(resp.response_length);
+ 
++	cq->res.type = RDMA_RESTRACK_CQ;
++	rdma_restrack_add(&cq->res);
++
+ 	ret = cb(file, obj, &resp, ucore, context);
+ 	if (ret)
+ 		goto err_cb;
+ 
+-	cq->res.type = RDMA_RESTRACK_CQ;
+-	rdma_restrack_add(&cq->res);
+-
+ 	mutex_lock(&file->mutex);
+ 	list_add_tail(&obj->uobject.list, &file->ucontext->cq_list);
+ 	mutex_unlock(&file->mutex);
+-- 
+2.9.3
+

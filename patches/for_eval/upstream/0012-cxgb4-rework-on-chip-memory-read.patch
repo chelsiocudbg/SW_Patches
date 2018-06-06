@@ -1,7 +1,7 @@
-From a9f9c3ee4a64aefef671c903a50c33ab72177c01 Mon Sep 17 00:00:00 2001
+From 40aaca5b577687798ebddaa8df8c57462325e4dd Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Mon, 2 Apr 2018 17:28:39 +0530
-Subject: [PATCH 12/14] cxgb4: rework on-chip memory read
+Subject: [PATCH 012/103] cxgb4: rework on-chip memory read
 
 commit 1a4330cdbf2270abcc0703837ef73148d0a75ccc
 Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>

@@ -1,8 +1,8 @@
-From a4c5e1438ec65641d8bb63294c50881d2cdb8521 Mon Sep 17 00:00:00 2001
+From c8ad4f74c270107d080debe15bb1a9d81ed26915 Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Wed, 16 May 2018 12:59:21 +0530
-Subject: [PATCH 21/22] cxgb4: core hardware/firmware support for Forward Error
- Correction on a link
+Subject: [PATCH 021/103] cxgb4: core hardware/firmware support for Forward
+ Error Correction on a link
 
 commit 158a5c0a24d1d83b3d7e7ba159eafbae1b9f9d60
 Author: Casey Leedom <leedom@chelsio.com>
@@ -17,7 +17,7 @@ Date:   Thu Jul 27 16:47:27 2017 -0700
  1 file changed, 117 insertions(+), 35 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
-index 55cc4a6e..ece1432f 100644
+index 55cc4a6e8a9b..ece1432fe6ac 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
 @@ -3953,11 +3953,64 @@ void t4_ulprx_read_la(struct adapter *adap, u32 *la_buf)
@@ -256,5 +256,5 @@ index 55cc4a6e..ece1432f 100644
  	lc->fec = lc->auto_fec;
  
 -- 
-2.14.1
+2.9.3
 

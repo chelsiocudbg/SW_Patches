@@ -1,8 +1,8 @@
-From aa5e6a0432345bbcb59807e2954ce4390d85bef5 Mon Sep 17 00:00:00 2001
+From 587999df9fb6f52722ac3f633bb4ba51462f3041 Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Mon, 2 Apr 2018 17:28:35 +0530
-Subject: [PATCH 10/14] cxgb4: fix incorrect condition for using firmware LDST
- commands
+Subject: [PATCH 010/103] cxgb4: fix incorrect condition for using firmware
+ LDST commands
 
 commit ebb5568fe27794cdcf18c8d9dc6b80dae98d79ec
 Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
