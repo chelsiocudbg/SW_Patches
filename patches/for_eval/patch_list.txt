@@ -1,110 +1,110 @@
-Patch									Commit-ID					Bugfix/Feature	Bug		Dependent Patches
+		Patch Name								Commit-ID			Status	Bugfix/Feature	Bug		Dependent Patches
 
-0001-patch_chelsio_driver-all-rhel7.4-applicable-patches-.patch
-0002-SVC-malloc-changes.patch
+0001-patch_chelsio_driver-all-rhel7.4-applicable-patches-.patch								In-use
+0002-SVC-malloc-changes.patch												In-use
 
-0003-cxgb4-notify-fatal-error-to-uld-drivers.patch			8b7372c101a5f9f38a092ab2533a75fc85c6e52a	Feature		37		0001
-0004-iw_cxgb4-Add-ib_device-get_netdev-support.patch			f215a3d2448ae77253f0b93dcc37114779f51778	Bugfix		39		0001
-0005-cxgb4-update-dump-collection-logic-to-use-compressio.patch		56cf2635ce30febd448dc78ff5361e4d9ad2fc0e	Feature		26		0001
-0006-cxgb4-use-zlib-deflate-to-compress-firmware-dump.patch		91c1953de38725d41cf9a677569a8cc280065064	Feature		26		0001, 0005
-0007-cxgb4-enable-ZLIB_DEFLATE-when-building-cxgb4.patch		a1cf9c9ffe652a4f109eb2cd8e69d8fcdb855d00	Feature		26		0001, 0005, 0006
-0008-cxgb4-properly-initialize-variables.patch				325694e6c3484959d066d5c0e9bff4c5966491a3	Feature		26		0001, 0005, 0006, 0007
-0009-cxgb4-reset-FW_OK-flag-on-firmware-crash.patch			825b2b6fd949b0042f3793daafa59b742c9e9d7a	Bugfix		26		0001
-0010-cxgb4-fix-incorrect-condition-for-using-firmware-LDS.patch		ebb5568fe27794cdcf18c8d9dc6b80dae98d79ec	Bugfix		26		0001
-0011-cxgb4-use-backdoor-access-to-collect-dumps-when-firm.patch		770ca3477a5bafe4422ead691500d2d99836dc1d	Bugfix		26		0001
-0012-cxgb4-rework-on-chip-memory-read.patch				1a4330cdbf2270abcc0703837ef73148d0a75ccc	Bugfix		26, 47		0001
-0013-cxgb4-speed-up-on-chip-memory-read.patch				7494f980ca0503e3eec6f4ba508186d269b37e7f	Feature		26		0001, 0012
-0014-cxgb4-fix-trailing-zero-in-CIM-LA-dump.patch			e6f02a4d57cc438099bc8abfba43ba1400d77b38	Bugfix		26		0001
+0003-cxgb4-notify-fatal-error-to-uld-drivers.patch			8b7372c101a5f9f38a092ab2533a75fc85c6e52a		Feature		37		0001
+0004-iw_cxgb4-Add-ib_device-get_netdev-support.patch			f215a3d2448ae77253f0b93dcc37114779f51778		Bugfix		39		0001
+0005-cxgb4-update-dump-collection-logic-to-use-compressio.patch		56cf2635ce30febd448dc78ff5361e4d9ad2fc0e		Feature		26		0001
+0006-cxgb4-use-zlib-deflate-to-compress-firmware-dump.patch		91c1953de38725d41cf9a677569a8cc280065064		Feature		26		0001, 0005
+0007-cxgb4-enable-ZLIB_DEFLATE-when-building-cxgb4.patch		a1cf9c9ffe652a4f109eb2cd8e69d8fcdb855d00		Feature		26		0001, 0005, 0006
+0008-cxgb4-properly-initialize-variables.patch				325694e6c3484959d066d5c0e9bff4c5966491a3		Feature		26		0001, 0005, 0006, 0007
+0009-cxgb4-reset-FW_OK-flag-on-firmware-crash.patch			825b2b6fd949b0042f3793daafa59b742c9e9d7a		Bugfix		26		0001
+0010-cxgb4-fix-incorrect-condition-for-using-firmware-LDS.patch		ebb5568fe27794cdcf18c8d9dc6b80dae98d79ec		Bugfix		26		0001
+0011-cxgb4-use-backdoor-access-to-collect-dumps-when-firm.patch		770ca3477a5bafe4422ead691500d2d99836dc1d		Bugfix		26		0001
+0012-cxgb4-rework-on-chip-memory-read.patch				1a4330cdbf2270abcc0703837ef73148d0a75ccc	In-use	Bugfix		26, 47		0001
+0013-cxgb4-speed-up-on-chip-memory-read.patch				7494f980ca0503e3eec6f4ba508186d269b37e7f		Feature		26		0001, 0012
+0014-cxgb4-fix-trailing-zero-in-CIM-LA-dump.patch			e6f02a4d57cc438099bc8abfba43ba1400d77b38		Bugfix		26		0001
 
-0015-RDMA-cxgb4-release-hw-resources-on-device-removal.patch		26bff1bd74a4f7417509a83295614e9dab995b2a	Bugfix		42		0001
-0016-iw_cxgb4-Atomically-flush-per-QP-HW-CQEs.patch			2df19e19ae90d94fd8724083f161f368a2797537	Bugfix		43		0001
-0017-vmcore-add-API-to-collect-hardware-dump-in-second-ke.patch		2724273e8fd00b512596a77ee063f49b25f36507	Feature		26		0001
-0018-vmcore-append-device-dumps-to-vmcore-as-elf-notes.patch		7efe48df8a3df6d089d2e9a1d429c82cc5dcf2de	Feature		26		0001, 0017
-0019-cxgb4-collect-hardware-dump-in-second-kernel.patch			1dde532dd0520a948fbc82f4522183104ee4808b	Feature		26		0001, 0017, 0018
-0020-net-ethtool-add-support-for-forward-error-correction.patch		1a5f3da20bd966220931239fbd31e6ac6ff42251	Bugfix		45		0001
-0021-cxgb4-core-hardware-firmware-support-for-Forward-Err.patch		158a5c0a24d1d83b3d7e7ba159eafbae1b9f9d60	Bugfix		45		0001, 0020
-0022-cxgb4-ethtool-forward-error-correction-management-su.patch		7fece840e35e52c7114dcf874a72b2c962923800	Bugfix		45		0001, 0020, 0021
-0023-cxgb4-update-LE-TCAM-collection-for-T6.patch			8e725f7caafb8e820e05707fe9853023375438cf	Bugfix		26		0001
-0024-cxgb4-collect-SGE-PF-VF-queue-map.patch				80a95a80d358ded600a517ea0a93fe86b8f8da84	Feature		26		0001
-0025-cxgb4-fix-offset-in-collecting-TX-rate-limit-info.patch		d775f26b295a0a303f7a73d7da46e04296484fe7	Bugfix		26		0001
-0026-vmcore-move-get_vmcore_size-out-of-__init.patch			44c752fe584d8b9f6e0756ecffa8691677471862	Bugfix		26		0001, 0017, 0018, 0019
+0015-RDMA-cxgb4-release-hw-resources-on-device-removal.patch		26bff1bd74a4f7417509a83295614e9dab995b2a	In-use	Bugfix		42		0001
+0016-iw_cxgb4-Atomically-flush-per-QP-HW-CQEs.patch			2df19e19ae90d94fd8724083f161f368a2797537	In-use	Bugfix		43		0001
+0017-vmcore-add-API-to-collect-hardware-dump-in-second-ke.patch		2724273e8fd00b512596a77ee063f49b25f36507		Feature		26		0001
+0018-vmcore-append-device-dumps-to-vmcore-as-elf-notes.patch		7efe48df8a3df6d089d2e9a1d429c82cc5dcf2de		Feature		26		0001, 0017
+0019-cxgb4-collect-hardware-dump-in-second-kernel.patch			1dde532dd0520a948fbc82f4522183104ee4808b		Feature		26		0001, 0017, 0018
+0020-net-ethtool-add-support-for-forward-error-correction.patch		1a5f3da20bd966220931239fbd31e6ac6ff42251		Bugfix		45		0001
+0021-cxgb4-core-hardware-firmware-support-for-Forward-Err.patch		158a5c0a24d1d83b3d7e7ba159eafbae1b9f9d60		Bugfix		45		0001, 0020
+0022-cxgb4-ethtool-forward-error-correction-management-su.patch		7fece840e35e52c7114dcf874a72b2c962923800		Bugfix		45		0001, 0020, 0021
+0023-cxgb4-update-LE-TCAM-collection-for-T6.patch			8e725f7caafb8e820e05707fe9853023375438cf		Bugfix		26		0001
+0024-cxgb4-collect-SGE-PF-VF-queue-map.patch				80a95a80d358ded600a517ea0a93fe86b8f8da84		Feature		26		0001
+0025-cxgb4-fix-offset-in-collecting-TX-rate-limit-info.patch		d775f26b295a0a303f7a73d7da46e04296484fe7		Bugfix		26		0001
+0026-vmcore-move-get_vmcore_size-out-of-__init.patch			44c752fe584d8b9f6e0756ecffa8691677471862		Bugfix		26		0001, 0017, 0018, 0019
 
-0027-RDMA-netlink-Reduce-exposure-of-RDMA-netlink-functio.patch		233c1955835bd8649003be9bb3d8e79788b08be1	Feature		25		[0027..0103]
-0028-IB-rdmavt-qib-hfi1-Remove-gfp-flags-argument.patch			0f4d027c3b4240ecb314daa948238d459fdc3a00	Feature		25		[0027..0103]
-0029-RDMA-netlink-Remove-netlink-clients-infrastructure.patch		c9901724a2f14128ef6a57986babcbfbcf61a257	Feature		25		[0027..0103]
-0030-RDMA-netlink-Remove-redundant-owner-option-for-netli.patch		64401b69b29164c5731018cc44fc9b144ac9c5ae	Feature		25		[0027..0103]
-0031-RDMA-netlink-Add-flag-to-consolidate-common-handling.patch		e3a2b93dddad315f01a4b67faee738954c084072	Feature		25		[0027..0103]
-0032-RDMA-core-Add-wait-retry-version-of-ibnl_unicast.patch		9047811b776ce09ba06623dd2a846cc501f0065b	Feature		25		[0027..0103]
-0033-RDMA-netlink-Rename-and-remove-redundant-parameter-f.patch		f00e64637061876ec7b6383b0bd80197c51e7312	Feature		25		[0027..0103]
-0034-RDMA-netlink-Rename-and-remove-redundant-parameter-f.patch		4d7f693af0c9d0d6940ff36f5adca1adfa0e7e6e	Feature		25		[0027..0103]
-0035-RDMA-netlink-Simplify-and-rename-ibnl_chk_listeners.patch		ff61c425c1c563f1d688d59caf3b18a395cbf9c4	Feature		25		[0027..0103]
-0036-RDMA-netlink-Rename-netlink-callback-struct.patch			3250b4dbd87aa08c21891cabfc6f6b48b36fd7e5	Feature		25		[0027..0103]
-0037-RDMA-core-Add-and-expose-static-device-index.patch			ecc82c53f9a4ce08ba7df626a4262c86841ced8f	Feature		25		[0027..0103]
-0038-RDMA-netlink-Add-and-implement-doit-netlink-callback.patch		1830ba21b9a475cfc6159e6cfe532c75fe7682a4	Feature		25		[0027..0103]
-0039-RDMA-netlink-Add-netlink-device-definitions-to-UAPI.patch		1a6e7c31d71db34d1b9bc3acc87eaea6c2ecc997	Feature		25		[0027..0103]
-0040-RDMA-netlink-Add-nldev-initialization-flows.patch			6c80b41abe22ae3c0d98f39a88f4b8fb501910d3	Feature		25		[0027..0103]
-0041-RDMA-core-Add-iterator-over-ib_devices.patch			8030c8357a94ce6397dd8df6296925f0f4b1f9b7	Feature		25		[0027..0103]
-0042-RDMA-netlink-Implement-nldev-device-dumpit-calback.patch		b4c598a67ea19c5784e542c03dd912a0ce36109a	Feature		25		[0027..0103]
-0043-RDMA-netlink-Add-nldev-device-doit-implementation.patch		e5c9469efcb18a6b7aed5e6f32e478b0298ad968	Feature		25		[0027..0103]
-0044-RDMA-netlink-Add-nldev-port-dumpit-implementation.patch		7d02f605f0dce0ef1b76aeffe2d36794738f24a0	Feature		25		[0027..0103]
-0045-IB-core-Add-inline-function-to-validate-port.patch			24dc831b77eca9361cf835be59fa69ea0e471afc	Feature		25		[0027..0103]
-0046-RDMA-netlink-Implement-nldev-port-doit-callback.patch		c3f66f7b0052ea854744372fdaae7817f5358e4f	Feature		25		[0027..0103]
-0047-RDMA-netlink-Expose-device-and-port-capability-masks.patch		ac50525374315b9b609747f83b07f8dccb06b722	Feature		25		[0027..0103]
-0048-RDMA-Simplify-get-firmware-interface.patch				9abb0d1bbd9529c574eacd8586e2bf68d17966cd	Feature		25		[0027..0103]
-0049-RDMA-netlink-Export-FW-version.patch				8621a7e3c1c22e18385c9ced1647363884ea2aa1	Feature		25		[0027..0103]
-0050-RDMA-netlink-Export-node_guid-and-sys_image_guid.patch		1aaff896ca6b968a639e3e1e72ba6146ba332501	Feature		25		[0027..0103]
-0051-RDMA-netlink-Advertise-IB-subnet-prefix.patch			12026fbba6af2fc53c3c6cf88bdfc6561986ba82	Feature		25		[0027..0103]
-0052-RDMA-netink-Export-lids-and-sm_lids.patch				80a06dd36f79de7007f21f5cbe42181a4e5c7d6d	Feature		25		[0027..0103]
-0053-RDMA-netlink-Export-LID-mask-control-LMC.patch			34840fea112d36507c19dc6052b8c6d88bdd9c16	Feature		25		[0027..0103]
-0054-RDMA-netlink-Provide-port-state-and-physical-link-st.patch		5654e49db0b2d87c12b6e120b6a830abe3d3921b	Feature		25		[0027..0103]
-0055-RDMA-netlink-Export-node_type.patch				1bb77b8c1d57149ed0aa6825255ead80ae584034	Feature		25		[0027..0103]
-0056-RDMA-core-ulp-Convert-register-unregister-event-hand.patch		dcc9881e6767559c04faf15804ac145a2ea026cb	Feature		25		[0027..0103]
-0057-RDMA-core-Cleanup-device-capability-enum.patch			78b57f9529225111b440e6e5150f52f5d44e3c60	Feature		25		[0027..0103]
-0058-RDMA-nldev-Enforce-device-index-check-for-port-callb.patch		287683d027a3ff83feb6c7044430c79881664ecf	Feature		25		[0027..0103]
-0059-RDMA-umem-Avoid-partial-declaration-of-non-static-fu.patch		fec99ededf6be46178d7f571b34dae80fc05f090	Feature		25		[0027..0103]
-0060-RDMA-core-Rename-kernel-modify_cq-to-better-describe.patch		4190b4e96954e2c3597021d29435c3f8db8d3129	Feature		25		[0027..0103]
-0061-RDMA-netlink-Fix-general-protection-fault.patch			d0e312fe3d34c1bc014a7f8ec6540d05e8077483	Feature		25		[0027..0103]
-0062-RDMA-nldev-Refactor-setting-the-nldev-handle-to-a-co.patch		c2409810c0c9148bca4c3e13ac96dced1e4c11c5	Feature		25		[0027..0103]
-0063-RDMA-netlink-Fix-locking-around-__ib_get_device_by_i.patch		f8978bd95cf92f869f3d9b34c1b699f49253b8c6	Feature		25		[0027..0103]
-0064-RDMA-cma-Mark-end-of-CMA-ID-messages.patch				e48e5e198fb6ec77c91047a694022f0fefa45292	Feature		25		[0027..0103]
-0065-RDMA-core-Use-the-MODNAME-instead-of-the-function-na.patch		e449644741af523fa345f41494e19a0914709a69	Feature		25		[0027..0103]
-0066-RDMA-core-Save-kernel-caller-name-when-creating-PD-a.patch		f66c8ba4c9fa193481fdb8030504287bf5ad4d69	Feature		25		[0027..0103]
-0067-RDMA-restrack-Add-general-infrastructure-to-track-RD.patch		02d8883f520ee91c4c40c0a31892eb25ea2df2c9	Feature		25		[0027..0103]
-0068-RDMA-nldev-Provide-global-resource-utilization.patch		bf3c5a93c52368410a521af34ed3bff91a99df44	Feature		25		[0027..0103]
-0069-RDMA-nldev-Provide-detailed-QP-information.patch			b5fa635aab8f0d39a824c01991266a6d06f007fb	Feature		25		[0027..0103]
-0070-RDMA-netlink-Hide-unimplemented-NLDEV-commands.patch		074b5abbf7a1f5d847df96e6b951d767f3a29a43	Feature		25		[0027..0103]
-0071-RDMA-restrack-Remove-unimplemented-XRCD-object.patch		415bb699d793f7ad9c67c04a766d1e655fa6b203	Feature		25		[0027..0103]
-0072-RDMA-restrack-don-t-use-uaccess_kernel.patch			2f08ee363fe097bc6dc01aac53e1798b16c00986	Feature		25		[0027..0103]
-0073-RDMA-restrack-clean-up-res_to_dev.patch				88831a2cfe2245822200ecf4bd7ff77abdf1499a	Feature		25		[0027..0103]
-0074-RDMA-nldev-common-resource-dumpit-function.patch			d12ff624828073f94628d49f6579e9c20acc56cd	Feature		25		[0027..0103]
-0075-RDMA-CM-move-rdma_id_private-to-cma_priv.h.patch			a3b641af72ba899991ed847556951128ef41d52f	Feature		25		[0027..0103]
-0076-RDMA-nldev-provide-detailed-CM_ID-information.patch		00313983cda6f37f747058e58c1cb8fba02bc134	Feature		25		[0027..0103]
-0077-RDMA-nldev-provide-detailed-CQ-information.patch			a34fc0893eef691863b5c118df8ff8e6c9fbc7b7	Feature		25		[0027..0103]
-0078-RDMA-nldev-provide-detailed-MR-information.patch			fccec5b89ac61ebe2f353feecd08a16621f2418b	Feature		25		[0027..0103]
-0079-RDMA-nldev-provide-detailed-PD-information.patch			29cf1351d450f95957eb0ef2e8cc0c7765fc5785	Feature		25		[0027..0103]
-0080-RDMA-verbs-Simplify-modify-QP-check.patch				19b1f54099b6ee334acbfbcfbdffd1d1f057216d	Feature		25		[0027..0103]
-0081-RDMA-ucma-Fix-access-to-non-initialized-CM_ID-object.patch		7688f2c3bbf55e52388e37ac5d63ca471a7712e1	Feature		25		[0027..0103]
-0082-RDMA-restrack-Don-t-rely-on-uninitialized-variable-i.patch		7d9a935e169b7e51a5f84caf8dfb02aad6206902	Feature		25		[0027..0103]
-0083-RDMA-verbs-Remove-restrack-entry-from-XRCD-structure.patch		80cf79ae4f688ead1dca8878990709c0446c3992	Feature		25		[0027..0103]
-0084-RDMA-restrack-Remove-ambiguity-in-resource-track-cle.patch		03286030ac0420c759fa25f5b976e40293bccaaf	Feature		25		[0027..0103]
-0085-RDMA-CMA-remove-RDMA_PS_SDP.patch					1b90d3002e3ee39b22de5604497b20edeeee558e	Feature		25		[0027..0103]
-0086-RDMA-CMA-Add-rdma_port_space-to-UAPI.patch				2253fc0caa800ba7c1e380446eb3fb7958a85b93	Feature		25		[0027..0103]
-0087-RDMA-nldev-Provide-netdevice-name-and-index.patch			5b2cc79de8782ea98ef22cddb26fcd566c565094	Feature		25		[0027..0103]
-0088-RDMA-nldev-Add-explicit-pad-attribute.patch			25a0ad85156a7b697d4340560fff0d25a3b19243	Feature		25		[0027..0103]
-0089-RDMA-nldev-add-driver-specific-resource-tracking.patch		da5c8507821573b8ed6e3f47e009f273493ffaf7	Feature		25		[0027..0103]
-0090-RDMA-nldev-helper-functions-to-add-driver-attributes.patch		73937e8a030b046c6b0fa73868bee25647a29be4	Feature		25		[0027..0103]
-0091-iw_cxgb4-dump-detailed-driver-specific-QP-informatio.patch		056f9c7f39bf517d58f32797f1eb1465bb6f6ef2	Feature		25		[0027..0103]
-0092-iw_cxgb4-fix-uninitialized-variable-warnings.patch			1ea62e816407987fc27a1bb2d011ea6d81338933	Feature		25		[0027..0103]
-0093-RDMA-NLDEV-remove-mr-iova-attribute.patch				e6125a254d7d2af806752c9b776d1ff4b565ce2e	Feature		25		[0027..0103]
-0094-iw_cxgb4-remove-wr_id-attributes.patch				2d478b28596f4fa6efd10a696f05e354be05de45	Feature		25		[0027..0103]
-0095-RDMA-CMA-add-rdma_iw_cm_id-and-rdma_res_to_id-helper.patch		fbdb0a9181cb4c489a857f6bf71648276c85969c	Feature		25		[0027..0103]
-0096-iw_cxgb4-provide-detailed-provider-specific-CM_ID-in.patch		116aeb8873712ea559d26b0d9d88147af5c88db5	Feature		25		[0027..0103]
-0097-iw_cxgb4-add-INFINIBAND_ADDR_TRANS-dependency.patch		e4b1672ac0a54c7740cbc4ff39dfdc56182236cb	Feature		25		[0027..0103]
-0098-iw_cxgb4-provide-detailed-driver-specific-CQ-informa.patch		54e7688e54bed5db5c7859cbdbf393e8b2b7ef0b	Feature		25		[0027..0103]
-0099-iw_cxgb4-provide-detailed-driver-specific-MR-informa.patch		013f64a88059fc65f01f1b967f1cf9c666a231a2	Feature		25		[0027..0103]
-0100-RDMA-core-Add-resource-tracking-for-create-and-destr.patch		78a0cd648a802450602c95e164a820fe1a165247	Feature		25		[0027..0103]
-0101-RDMA-core-Add-resource-tracking-for-create-and-destr.patch		08f294a1524bc3211a28091daa6c7513828c7d33	Feature		25		[0027..0103]
-0102-RDMA-core-Add-resource-tracking-for-create-and-destr.patch		9d5f8c209b3f29259e6aa9595ea2dc2dfa27549a	Feature		25		[0027..0103]
-0103-RDMA-restrack-Increment-CQ-restrack-object-before-co.patch		0cba0efcc7238d47a045a8d7a4079f6a22993546	Feature		25		[0027..0103]
+0027-RDMA-netlink-Reduce-exposure-of-RDMA-netlink-functio.patch		233c1955835bd8649003be9bb3d8e79788b08be1		Feature		25		[0027..0103]
+0028-IB-rdmavt-qib-hfi1-Remove-gfp-flags-argument.patch			0f4d027c3b4240ecb314daa948238d459fdc3a00		Feature		25		[0027..0103]
+0029-RDMA-netlink-Remove-netlink-clients-infrastructure.patch		c9901724a2f14128ef6a57986babcbfbcf61a257		Feature		25		[0027..0103]
+0030-RDMA-netlink-Remove-redundant-owner-option-for-netli.patch		64401b69b29164c5731018cc44fc9b144ac9c5ae		Feature		25		[0027..0103]
+0031-RDMA-netlink-Add-flag-to-consolidate-common-handling.patch		e3a2b93dddad315f01a4b67faee738954c084072		Feature		25		[0027..0103]
+0032-RDMA-core-Add-wait-retry-version-of-ibnl_unicast.patch		9047811b776ce09ba06623dd2a846cc501f0065b		Feature		25		[0027..0103]
+0033-RDMA-netlink-Rename-and-remove-redundant-parameter-f.patch		f00e64637061876ec7b6383b0bd80197c51e7312		Feature		25		[0027..0103]
+0034-RDMA-netlink-Rename-and-remove-redundant-parameter-f.patch		4d7f693af0c9d0d6940ff36f5adca1adfa0e7e6e		Feature		25		[0027..0103]
+0035-RDMA-netlink-Simplify-and-rename-ibnl_chk_listeners.patch		ff61c425c1c563f1d688d59caf3b18a395cbf9c4		Feature		25		[0027..0103]
+0036-RDMA-netlink-Rename-netlink-callback-struct.patch			3250b4dbd87aa08c21891cabfc6f6b48b36fd7e5		Feature		25		[0027..0103]
+0037-RDMA-core-Add-and-expose-static-device-index.patch			ecc82c53f9a4ce08ba7df626a4262c86841ced8f		Feature		25		[0027..0103]
+0038-RDMA-netlink-Add-and-implement-doit-netlink-callback.patch		1830ba21b9a475cfc6159e6cfe532c75fe7682a4		Feature		25		[0027..0103]
+0039-RDMA-netlink-Add-netlink-device-definitions-to-UAPI.patch		1a6e7c31d71db34d1b9bc3acc87eaea6c2ecc997		Feature		25		[0027..0103]
+0040-RDMA-netlink-Add-nldev-initialization-flows.patch			6c80b41abe22ae3c0d98f39a88f4b8fb501910d3		Feature		25		[0027..0103]
+0041-RDMA-core-Add-iterator-over-ib_devices.patch			8030c8357a94ce6397dd8df6296925f0f4b1f9b7		Feature		25		[0027..0103]
+0042-RDMA-netlink-Implement-nldev-device-dumpit-calback.patch		b4c598a67ea19c5784e542c03dd912a0ce36109a		Feature		25		[0027..0103]
+0043-RDMA-netlink-Add-nldev-device-doit-implementation.patch		e5c9469efcb18a6b7aed5e6f32e478b0298ad968		Feature		25		[0027..0103]
+0044-RDMA-netlink-Add-nldev-port-dumpit-implementation.patch		7d02f605f0dce0ef1b76aeffe2d36794738f24a0		Feature		25		[0027..0103]
+0045-IB-core-Add-inline-function-to-validate-port.patch			24dc831b77eca9361cf835be59fa69ea0e471afc		Feature		25		[0027..0103]
+0046-RDMA-netlink-Implement-nldev-port-doit-callback.patch		c3f66f7b0052ea854744372fdaae7817f5358e4f		Feature		25		[0027..0103]
+0047-RDMA-netlink-Expose-device-and-port-capability-masks.patch		ac50525374315b9b609747f83b07f8dccb06b722		Feature		25		[0027..0103]
+0048-RDMA-Simplify-get-firmware-interface.patch				9abb0d1bbd9529c574eacd8586e2bf68d17966cd		Feature		25		[0027..0103]
+0049-RDMA-netlink-Export-FW-version.patch				8621a7e3c1c22e18385c9ced1647363884ea2aa1		Feature		25		[0027..0103]
+0050-RDMA-netlink-Export-node_guid-and-sys_image_guid.patch		1aaff896ca6b968a639e3e1e72ba6146ba332501		Feature		25		[0027..0103]
+0051-RDMA-netlink-Advertise-IB-subnet-prefix.patch			12026fbba6af2fc53c3c6cf88bdfc6561986ba82		Feature		25		[0027..0103]
+0052-RDMA-netink-Export-lids-and-sm_lids.patch				80a06dd36f79de7007f21f5cbe42181a4e5c7d6d		Feature		25		[0027..0103]
+0053-RDMA-netlink-Export-LID-mask-control-LMC.patch			34840fea112d36507c19dc6052b8c6d88bdd9c16		Feature		25		[0027..0103]
+0054-RDMA-netlink-Provide-port-state-and-physical-link-st.patch		5654e49db0b2d87c12b6e120b6a830abe3d3921b		Feature		25		[0027..0103]
+0055-RDMA-netlink-Export-node_type.patch				1bb77b8c1d57149ed0aa6825255ead80ae584034		Feature		25		[0027..0103]
+0056-RDMA-core-ulp-Convert-register-unregister-event-hand.patch		dcc9881e6767559c04faf15804ac145a2ea026cb		Feature		25		[0027..0103]
+0057-RDMA-core-Cleanup-device-capability-enum.patch			78b57f9529225111b440e6e5150f52f5d44e3c60		Feature		25		[0027..0103]
+0058-RDMA-nldev-Enforce-device-index-check-for-port-callb.patch		287683d027a3ff83feb6c7044430c79881664ecf		Feature		25		[0027..0103]
+0059-RDMA-umem-Avoid-partial-declaration-of-non-static-fu.patch		fec99ededf6be46178d7f571b34dae80fc05f090		Feature		25		[0027..0103]
+0060-RDMA-core-Rename-kernel-modify_cq-to-better-describe.patch		4190b4e96954e2c3597021d29435c3f8db8d3129		Feature		25		[0027..0103]
+0061-RDMA-netlink-Fix-general-protection-fault.patch			d0e312fe3d34c1bc014a7f8ec6540d05e8077483		Feature		25		[0027..0103]
+0062-RDMA-nldev-Refactor-setting-the-nldev-handle-to-a-co.patch		c2409810c0c9148bca4c3e13ac96dced1e4c11c5		Feature		25		[0027..0103]
+0063-RDMA-netlink-Fix-locking-around-__ib_get_device_by_i.patch		f8978bd95cf92f869f3d9b34c1b699f49253b8c6		Feature		25		[0027..0103]
+0064-RDMA-cma-Mark-end-of-CMA-ID-messages.patch				e48e5e198fb6ec77c91047a694022f0fefa45292		Feature		25		[0027..0103]
+0065-RDMA-core-Use-the-MODNAME-instead-of-the-function-na.patch		e449644741af523fa345f41494e19a0914709a69		Feature		25		[0027..0103]
+0066-RDMA-core-Save-kernel-caller-name-when-creating-PD-a.patch		f66c8ba4c9fa193481fdb8030504287bf5ad4d69		Feature		25		[0027..0103]
+0067-RDMA-restrack-Add-general-infrastructure-to-track-RD.patch		02d8883f520ee91c4c40c0a31892eb25ea2df2c9		Feature		25		[0027..0103]
+0068-RDMA-nldev-Provide-global-resource-utilization.patch		bf3c5a93c52368410a521af34ed3bff91a99df44		Feature		25		[0027..0103]
+0069-RDMA-nldev-Provide-detailed-QP-information.patch			b5fa635aab8f0d39a824c01991266a6d06f007fb		Feature		25		[0027..0103]
+0070-RDMA-netlink-Hide-unimplemented-NLDEV-commands.patch		074b5abbf7a1f5d847df96e6b951d767f3a29a43		Feature		25		[0027..0103]
+0071-RDMA-restrack-Remove-unimplemented-XRCD-object.patch		415bb699d793f7ad9c67c04a766d1e655fa6b203		Feature		25		[0027..0103]
+0072-RDMA-restrack-don-t-use-uaccess_kernel.patch			2f08ee363fe097bc6dc01aac53e1798b16c00986		Feature		25		[0027..0103]
+0073-RDMA-restrack-clean-up-res_to_dev.patch				88831a2cfe2245822200ecf4bd7ff77abdf1499a		Feature		25		[0027..0103]
+0074-RDMA-nldev-common-resource-dumpit-function.patch			d12ff624828073f94628d49f6579e9c20acc56cd		Feature		25		[0027..0103]
+0075-RDMA-CM-move-rdma_id_private-to-cma_priv.h.patch			a3b641af72ba899991ed847556951128ef41d52f		Feature		25		[0027..0103]
+0076-RDMA-nldev-provide-detailed-CM_ID-information.patch		00313983cda6f37f747058e58c1cb8fba02bc134		Feature		25		[0027..0103]
+0077-RDMA-nldev-provide-detailed-CQ-information.patch			a34fc0893eef691863b5c118df8ff8e6c9fbc7b7		Feature		25		[0027..0103]
+0078-RDMA-nldev-provide-detailed-MR-information.patch			fccec5b89ac61ebe2f353feecd08a16621f2418b		Feature		25		[0027..0103]
+0079-RDMA-nldev-provide-detailed-PD-information.patch			29cf1351d450f95957eb0ef2e8cc0c7765fc5785		Feature		25		[0027..0103]
+0080-RDMA-verbs-Simplify-modify-QP-check.patch				19b1f54099b6ee334acbfbcfbdffd1d1f057216d		Feature		25		[0027..0103]
+0081-RDMA-ucma-Fix-access-to-non-initialized-CM_ID-object.patch		7688f2c3bbf55e52388e37ac5d63ca471a7712e1		Feature		25		[0027..0103]
+0082-RDMA-restrack-Don-t-rely-on-uninitialized-variable-i.patch		7d9a935e169b7e51a5f84caf8dfb02aad6206902		Feature		25		[0027..0103]
+0083-RDMA-verbs-Remove-restrack-entry-from-XRCD-structure.patch		80cf79ae4f688ead1dca8878990709c0446c3992		Feature		25		[0027..0103]
+0084-RDMA-restrack-Remove-ambiguity-in-resource-track-cle.patch		03286030ac0420c759fa25f5b976e40293bccaaf		Feature		25		[0027..0103]
+0085-RDMA-CMA-remove-RDMA_PS_SDP.patch					1b90d3002e3ee39b22de5604497b20edeeee558e		Feature		25		[0027..0103]
+0086-RDMA-CMA-Add-rdma_port_space-to-UAPI.patch				2253fc0caa800ba7c1e380446eb3fb7958a85b93		Feature		25		[0027..0103]
+0087-RDMA-nldev-Provide-netdevice-name-and-index.patch			5b2cc79de8782ea98ef22cddb26fcd566c565094		Feature		25		[0027..0103]
+0088-RDMA-nldev-Add-explicit-pad-attribute.patch			25a0ad85156a7b697d4340560fff0d25a3b19243		Feature		25		[0027..0103]
+0089-RDMA-nldev-add-driver-specific-resource-tracking.patch		da5c8507821573b8ed6e3f47e009f273493ffaf7		Feature		25		[0027..0103]
+0090-RDMA-nldev-helper-functions-to-add-driver-attributes.patch		73937e8a030b046c6b0fa73868bee25647a29be4		Feature		25		[0027..0103]
+0091-iw_cxgb4-dump-detailed-driver-specific-QP-informatio.patch		056f9c7f39bf517d58f32797f1eb1465bb6f6ef2		Feature		25		[0027..0103]
+0092-iw_cxgb4-fix-uninitialized-variable-warnings.patch			1ea62e816407987fc27a1bb2d011ea6d81338933		Feature		25		[0027..0103]
+0093-RDMA-NLDEV-remove-mr-iova-attribute.patch				e6125a254d7d2af806752c9b776d1ff4b565ce2e		Feature		25		[0027..0103]
+0094-iw_cxgb4-remove-wr_id-attributes.patch				2d478b28596f4fa6efd10a696f05e354be05de45		Feature		25		[0027..0103]
+0095-RDMA-CMA-add-rdma_iw_cm_id-and-rdma_res_to_id-helper.patch		fbdb0a9181cb4c489a857f6bf71648276c85969c		Feature		25		[0027..0103]
+0096-iw_cxgb4-provide-detailed-provider-specific-CM_ID-in.patch		116aeb8873712ea559d26b0d9d88147af5c88db5		Feature		25		[0027..0103]
+0097-iw_cxgb4-add-INFINIBAND_ADDR_TRANS-dependency.patch		e4b1672ac0a54c7740cbc4ff39dfdc56182236cb		Feature		25		[0027..0103]
+0098-iw_cxgb4-provide-detailed-driver-specific-CQ-informa.patch		54e7688e54bed5db5c7859cbdbf393e8b2b7ef0b		Feature		25		[0027..0103]
+0099-iw_cxgb4-provide-detailed-driver-specific-MR-informa.patch		013f64a88059fc65f01f1b967f1cf9c666a231a2		Feature		25		[0027..0103]
+0100-RDMA-core-Add-resource-tracking-for-create-and-destr.patch		78a0cd648a802450602c95e164a820fe1a165247		Feature		25		[0027..0103]
+0101-RDMA-core-Add-resource-tracking-for-create-and-destr.patch		08f294a1524bc3211a28091daa6c7513828c7d33		Feature		25		[0027..0103]
+0102-RDMA-core-Add-resource-tracking-for-create-and-destr.patch		9d5f8c209b3f29259e6aa9595ea2dc2dfa27549a		Feature		25		[0027..0103]
+0103-RDMA-restrack-Increment-CQ-restrack-object-before-co.patch		0cba0efcc7238d47a045a8d7a4079f6a22993546		Feature		25		[0027..0103]
 
-0001-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.			Feature		26		0001, 0012, 0013
+0001-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.				Feature		26		0001, 0012, 0013
