@@ -109,5 +109,6 @@
 
 0104-cxgb4-Add-support-for-new-flash-parts.patch			96ac18f14a5a721dc4233f1c6ebd07e103ae5a63		Bugfix				0001
 0105-cxgb4-fix-missing-break-in-switch-and-indent-return-.patch		5dc874252faa818426480a7c00fa05738fe05402		Bugfix				0001, 0104
+0106-cxgb4-support-new-ISSI-flash-parts.patch				0f1417f9f0ed3f367502011b187a293cea0e2435		Bugfix				0001, 0104, 0105
 
 0001-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.				Feature		26		0001, 0012, 0013
