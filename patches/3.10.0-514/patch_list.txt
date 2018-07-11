@@ -107,6 +107,10 @@
 0106-cxgb4-fix-trailing-zero-in-CIM-LA-dump.patch			e6f02a4d57cc438099bc8abfba43ba1400d77b38
 0107-RDMA-cxgb4-release-hw-resources-on-device-removal.patch		26bff1bd74a4f7417509a83295614e9dab995b2a
 0108-iw_cxgb4-Atomically-flush-per-QP-HW-CQEs.patch			2df19e19ae90d94fd8724083f161f368a2797537
+0109-cxgb4-Add-support-for-new-flash-parts.patch			96ac18f14a5a721dc4233f1c6ebd07e103ae5a63
+0110-cxgb4-fix-missing-break-in-switch-and-indent-return-.patch		5dc874252faa818426480a7c00fa05738fe05402
+0111-cxgb4-support-new-ISSI-flash-parts.patch				0f1417f9f0ed3f367502011b187a293cea0e2435
+0112-cxgb4-assume-flash-part-size-to-be-4MB-if-it-can-t-b.patch		843789f6dd6ae1651a77ac99c13bcaf191ebe05c
 
 0001-cxgb4-collect-cudbg-debug-logs-during-kernel-crash.patch		Not available in upstream.
 0002-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.
