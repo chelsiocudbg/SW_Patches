@@ -105,6 +105,8 @@
 0104-cxgb4-rework-on-chip-memory-read.patch				1a4330cdbf2270abcc0703837ef73148d0a75ccc
 0105-cxgb4-speed-up-on-chip-memory-read.patch				7494f980ca0503e3eec6f4ba508186d269b37e7f
 0106-cxgb4-fix-trailing-zero-in-CIM-LA-dump.patch			e6f02a4d57cc438099bc8abfba43ba1400d77b38
+0107-RDMA-cxgb4-release-hw-resources-on-device-removal.patch		26bff1bd74a4f7417509a83295614e9dab995b2a
+0108-iw_cxgb4-Atomically-flush-per-QP-HW-CQEs.patch			2df19e19ae90d94fd8724083f161f368a2797537
 
 0001-cxgb4-collect-cudbg-debug-logs-during-kernel-crash.patch		Not available in upstream.
 0002-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.
