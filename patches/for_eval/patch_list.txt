@@ -113,5 +113,6 @@
 0107-cxgb4-assume-flash-part-size-to-be-4MB-if-it-can-t-b.patch		843789f6dd6ae1651a77ac99c13bcaf191ebe05c		Bugfix				0001, 0104, 0105, 0106
 0108-cxgb4-remove-stats-fetched-from-firmware.patch			b351b16d8aa75856592d47600d6b3c6abee7ecbd		Bugfix		50		0001
 0109-cxgb4-expose-stats-fetched-from-firmware-via-debugfs.patch		31e5f5c3e92f6560485d7625f772e36aec6d42ec		Bugfix		50		0001, 0108
+0110-cxgb4-collect-ASIC-LA-dumps-from-ULP-TX.patch			1eb94d441f1c6aff4a594662d11c183520ffe4f3		Feature		26, 50		0001, 0005, 0006, 0007, 0008
 
 0001-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.				Feature		26		0001, 0012, 0013
