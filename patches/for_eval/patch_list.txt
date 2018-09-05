@@ -118,5 +118,6 @@
 0112-cxgb4-collect-number-of-free-PSTRUCT-page-pointers.patch		9d0f180cd509aec0172ae15bf1aed54de34d1132		Feature		26, 53		0001, 0005, 0006, 0007, 0008
 0113-cxgb4-move-Tx-Rx-free-pages-collection-to-common-cod.patch		ae2a922fae023164b3e0de62db3a2e6e93305c2e		Feature		26, 53		0001, 0005, 0006, 0007, 0008, 0111
 0114-cxgb4-print-ULD-queue-information-managed-by-LLD.patch		27defe9d8f6a548e26cd8d9029e5d002163ba854		Feature		25		0001
+0115-cxgb4-collect-hardware-queue-descriptors.patch			68ddc82aff0c772364757028c2319f386464d512		Feature		25		0001, 0005, 0006, 0007, 0008
 
 0001-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.				Feature		26		0001, 0012, 0013
