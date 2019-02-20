@@ -1,0 +1,41 @@
+From 5b2ba6bb4017e14d78c9f998e91e27905744cc17 Mon Sep 17 00:00:00 2001
+From: Steve Wise <swise@opengridcomputing.com>
+Date: Fri, 1 Feb 2019 12:44:53 -0800
+Subject: [PATCH 120/124] iw_cxgb4: use tos when finding ipv6 routes
+
+When IPv6 support was added, the correct tos was not passed to
+cxgb_find_route6(). This potentially results in the wrong route entry.
+
+Fixes: 830662f6f032 ("RDMA/cxgb4: Add support for active and passive open connection with IPv6 address")
+Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+Signed-off-by: Jason Gunthorpe <jgg@mellanox.com>
+---
+ drivers/infiniband/hw/cxgb4/cm.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
+index f7a1e16a5f9d..2e4ae5cd49ed 100644
+--- a/drivers/infiniband/hw/cxgb4/cm.c
++++ b/drivers/infiniband/hw/cxgb4/cm.c
+@@ -2132,7 +2132,8 @@ static int c4iw_reconnect(struct c4iw_ep *ep)
+ 					   laddr6->sin6_addr.s6_addr,
+ 					   raddr6->sin6_addr.s6_addr,
+ 					   laddr6->sin6_port,
+-					   raddr6->sin6_port, 0,
++					   raddr6->sin6_port,
++					   ep->com.cm_id->tos,
+ 					   raddr6->sin6_scope_id);
+ 		iptype = 6;
+ 		ra = (__u8 *)&raddr6->sin6_addr;
+@@ -3276,7 +3277,7 @@ int c4iw_connect(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
+ 					   laddr6->sin6_addr.s6_addr,
+ 					   raddr6->sin6_addr.s6_addr,
+ 					   laddr6->sin6_port,
+-					   raddr6->sin6_port, 0,
++					   raddr6->sin6_port, cm_id->tos,
+ 					   raddr6->sin6_scope_id);
+ 	}
+ 	if (!ep->dst) {
+-- 
+2.18.0.232.gb7bd9486b055
+

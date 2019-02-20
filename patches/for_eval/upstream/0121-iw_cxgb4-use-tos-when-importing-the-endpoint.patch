@@ -1,0 +1,30 @@
+From a849e717d66c3ecb09529cecda8ac4f237fe02ea Mon Sep 17 00:00:00 2001
+From: Steve Wise <swise@opengridcomputing.com>
+Date: Fri, 1 Feb 2019 12:44:41 -0800
+Subject: [PATCH 121/124] iw_cxgb4: use tos when importing the endpoint
+
+import_ep() is passed the correct tos, but doesn't use it correctly.
+
+Fixes: ac8e4c69a021 ("cxgb4/iw_cxgb4: TOS support")
+Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+Signed-off-by: Jason Gunthorpe <jgg@mellanox.com>
+---
+ drivers/infiniband/hw/cxgb4/cm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
+index 2e4ae5cd49ed..6d31bd2149a8 100644
+--- a/drivers/infiniband/hw/cxgb4/cm.c
++++ b/drivers/infiniband/hw/cxgb4/cm.c
+@@ -2042,7 +2042,7 @@ static int import_ep(struct c4iw_ep *ep, int iptype, __u8 *peer_ip,
+ 	} else {
+ 		pdev = get_real_dev(n->dev);
+ 		ep->l2t = cxgb4_l2t_get(cdev->rdev.lldi.l2t,
+-					n, pdev, 0);
++					n, pdev, rt_tos2priority(tos));
+ 		if (!ep->l2t)
+ 			goto out;
+ 		ep->mtu = dst_mtu(dst);
+-- 
+2.18.0.232.gb7bd9486b055
+

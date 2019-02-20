@@ -1,0 +1,51 @@
+From 797359baf64b275196ec09afa30f26db20211ecc Mon Sep 17 00:00:00 2001
+From: Steve Wise <swise@opengridcomputing.com>
+Date: Fri, 1 Feb 2019 12:44:32 -0800
+Subject: [PATCH 119/124] RDMA/iwcm: add tos_set bool to iw_cm struct
+
+This allows drivers to know the tos was actively set by the application.
+
+Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+Signed-off-by: Jason Gunthorpe <jgg@mellanox.com>
+---
+ drivers/infiniband/core/cma.c | 2 ++
+ include/rdma/iw_cm.h          | 3 ++-
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/core/cma.c b/drivers/infiniband/core/cma.c
+index b08a51dced64..6dd0cafc343f 100644
+--- a/drivers/infiniband/core/cma.c
++++ b/drivers/infiniband/core/cma.c
+@@ -2213,6 +2213,7 @@ static int cma_iw_listen(struct rdma_id_private *id_priv, int backlog)
+ 		return PTR_ERR(id);
+ 
+ 	id->tos = id_priv->tos;
++	id->tos_set = id_priv->tos_set;
+ 	id_priv->cm_id.iw = id;
+ 
+ 	memcpy(&id_priv->cm_id.iw->local_addr, cma_src_addr(id_priv),
+@@ -3516,6 +3517,7 @@ static int cma_connect_iw(struct rdma_id_private *id_priv,
+ 		return PTR_ERR(cm_id);
+ 
+ 	cm_id->tos = id_priv->tos;
++	cm_id->tos_set = id_priv->tos_set;
+ 	id_priv->cm_id.iw = cm_id;
+ 
+ 	memcpy(&cm_id->local_addr, cma_src_addr(id_priv),
+diff --git a/include/rdma/iw_cm.h b/include/rdma/iw_cm.h
+index 5cd7701db148..09c3468aaeeb 100644
+--- a/include/rdma/iw_cm.h
++++ b/include/rdma/iw_cm.h
+@@ -94,7 +94,8 @@ struct iw_cm_id {
+ 	void (*add_ref)(struct iw_cm_id *);
+ 	void (*rem_ref)(struct iw_cm_id *);
+ 	u8  tos;
+-	bool mapped;
++	bool tos_set:1;
++	bool mapped:1;
+ };
+ 
+ struct iw_cm_conn_param {
+-- 
+2.18.0.232.gb7bd9486b055
+
