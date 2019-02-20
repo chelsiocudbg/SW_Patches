@@ -126,5 +126,7 @@
 0120-iw_cxgb4-use-tos-when-finding-ipv6-routes.patch			c8a7eb554a83214c3d8ee5cb322da8c72810d2dc		Bugfix		70		[0116..0122]
 0121-iw_cxgb4-use-tos-when-importing-the-endpoint.patch			cb3ba0bde881f0cb7e3945d2a266901e2bd18c92		Bugfix		70		[0116..0122]
 0122-iw_cxgb4-use-listening-ep-tos-when-accepting-new-con.patch		7235ea227e19100ca748ccd6279322a166a90953		Bugfix		70		[0116..0122]
+0123-cxgb4-cxgb4vf-Add-support-for-SGE-doorbell-queue-tim.patch		543a1b85e734d2ec62e5df61641e8ea7349de4a8 		Bugfix		54		[0123..0124]
+0124-cxgb4-Add-capability-to-get-set-SGE-Doorbell-Queue-T.patch		d429005fdf2c9da19429c8b343eea61bd55b7c00		Bugfix		54		[0123..0124]
 
 0001-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.				Feature		26		0001, 0012, 0013
