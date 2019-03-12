@@ -47,7 +47,7 @@
 0042-RDMA-netlink-Implement-nldev-device-dumpit-calback.patch		b4c598a67ea19c5784e542c03dd912a0ce36109a		Feature		25		[0027..0103]
 0043-RDMA-netlink-Add-nldev-device-doit-implementation.patch		e5c9469efcb18a6b7aed5e6f32e478b0298ad968		Feature		25		[0027..0103]
 0044-RDMA-netlink-Add-nldev-port-dumpit-implementation.patch		7d02f605f0dce0ef1b76aeffe2d36794738f24a0		Feature		25		[0027..0103]
-0045-IB-core-Add-inline-function-to-validate-port.patch			24dc831b77eca9361cf835be59fa69ea0e471afc		Feature		25		[0027..0103]
+0045-IB-core-Add-inline-function-to-validate-port.patch			24dc831b77eca9361cf835be59fa69ea0e471afc	In-use	Feature		25		[0027..0103]
 0046-RDMA-netlink-Implement-nldev-port-doit-callback.patch		c3f66f7b0052ea854744372fdaae7817f5358e4f		Feature		25		[0027..0103]
 0047-RDMA-netlink-Expose-device-and-port-capability-masks.patch		ac50525374315b9b609747f83b07f8dccb06b722		Feature		25		[0027..0103]
 0048-RDMA-Simplify-get-firmware-interface.patch				9abb0d1bbd9529c574eacd8586e2bf68d17966cd		Feature		25		[0027..0103]
@@ -77,7 +77,7 @@
 0072-RDMA-restrack-don-t-use-uaccess_kernel.patch			2f08ee363fe097bc6dc01aac53e1798b16c00986		Feature		25		[0027..0103]
 0073-RDMA-restrack-clean-up-res_to_dev.patch				88831a2cfe2245822200ecf4bd7ff77abdf1499a		Feature		25		[0027..0103]
 0074-RDMA-nldev-common-resource-dumpit-function.patch			d12ff624828073f94628d49f6579e9c20acc56cd		Feature		25		[0027..0103]
-0075-RDMA-CM-move-rdma_id_private-to-cma_priv.h.patch			a3b641af72ba899991ed847556951128ef41d52f		Feature		25		[0027..0103]
+0075-RDMA-CM-move-rdma_id_private-to-cma_priv.h.patch			a3b641af72ba899991ed847556951128ef41d52f	In-use	Feature		25		[0027..0103]
 0076-RDMA-nldev-provide-detailed-CM_ID-information.patch		00313983cda6f37f747058e58c1cb8fba02bc134		Feature		25		[0027..0103]
 0077-RDMA-nldev-provide-detailed-CQ-information.patch			a34fc0893eef691863b5c118df8ff8e6c9fbc7b7		Feature		25		[0027..0103]
 0078-RDMA-nldev-provide-detailed-MR-information.patch			fccec5b89ac61ebe2f353feecd08a16621f2418b		Feature		25		[0027..0103]
@@ -119,14 +119,14 @@
 0113-cxgb4-move-Tx-Rx-free-pages-collection-to-common-cod.patch		ae2a922fae023164b3e0de62db3a2e6e93305c2e		Feature		26, 53		0001, 0005, 0006, 0007, 0008, 0111
 0114-cxgb4-print-ULD-queue-information-managed-by-LLD.patch		27defe9d8f6a548e26cd8d9029e5d002163ba854		Feature		25		0001
 0115-cxgb4-collect-hardware-queue-descriptors.patch			68ddc82aff0c772364757028c2319f386464d512		Feature		25		0001, 0005, 0006, 0007, 0008
-0116-IB-cma-Add-default-RoCE-TOS-to-CMA-configfs.patch			89052d784bc977c2a0b92393f6bd57140952c206		Bugfix		70		[0116..0122]
-0117-cxgb4-update-supported-DCB-version.patch				c3ec8bcceb07ab81e4ff017b4ebbacc137a5a15e		Bugfix		70		[0116..0122]
-0118-RDMA-cma-listening-device-cm_ids-should-inherit-tos.patch		9491128f780e5be382a5b22990439d017f6dfc59		Bugfix		70		[0116..0122]
-0119-RDMA-iwcm-add-tos_set-bool-to-iw_cm-struct.patch			926ba19b3574f6a80823a42484877ed65e91da9c		Bugfix		70		[0116..0122]
-0120-iw_cxgb4-use-tos-when-finding-ipv6-routes.patch			c8a7eb554a83214c3d8ee5cb322da8c72810d2dc		Bugfix		70		[0116..0122]
-0121-iw_cxgb4-use-tos-when-importing-the-endpoint.patch			cb3ba0bde881f0cb7e3945d2a266901e2bd18c92		Bugfix		70		[0116..0122]
-0122-iw_cxgb4-use-listening-ep-tos-when-accepting-new-con.patch		7235ea227e19100ca748ccd6279322a166a90953		Bugfix		70		[0116..0122]
-0123-cxgb4-cxgb4vf-Add-support-for-SGE-doorbell-queue-tim.patch		543a1b85e734d2ec62e5df61641e8ea7349de4a8 		Bugfix		54		[0123..0124]
-0124-cxgb4-Add-capability-to-get-set-SGE-Doorbell-Queue-T.patch		d429005fdf2c9da19429c8b343eea61bd55b7c00		Bugfix		54		[0123..0124]
+0116-IB-cma-Add-default-RoCE-TOS-to-CMA-configfs.patch			89052d784bc977c2a0b92393f6bd57140952c206	In-use	Bugfix		70		[0116..0122]
+0117-cxgb4-update-supported-DCB-version.patch				c3ec8bcceb07ab81e4ff017b4ebbacc137a5a15e	In-use	Bugfix		70		[0116..0122]
+0118-RDMA-cma-listening-device-cm_ids-should-inherit-tos.patch		9491128f780e5be382a5b22990439d017f6dfc59	In-use	Bugfix		70		[0116..0122]
+0119-RDMA-iwcm-add-tos_set-bool-to-iw_cm-struct.patch			926ba19b3574f6a80823a42484877ed65e91da9c	In-use	Bugfix		70		[0116..0122]
+0120-iw_cxgb4-use-tos-when-finding-ipv6-routes.patch			c8a7eb554a83214c3d8ee5cb322da8c72810d2dc	In-use	Bugfix		70		[0116..0122]
+0121-iw_cxgb4-use-tos-when-importing-the-endpoint.patch			cb3ba0bde881f0cb7e3945d2a266901e2bd18c92	In-use	Bugfix		70		[0116..0122]
+0122-iw_cxgb4-use-listening-ep-tos-when-accepting-new-con.patch		7235ea227e19100ca748ccd6279322a166a90953	In-use	Bugfix		70		[0116..0122]
+0123-cxgb4-cxgb4vf-Add-support-for-SGE-doorbell-queue-tim.patch		543a1b85e734d2ec62e5df61641e8ea7349de4a8 	In-use	Bugfix		54		[0123..0124]
+0124-cxgb4-Add-capability-to-get-set-SGE-Doorbell-Queue-T.patch		d429005fdf2c9da19429c8b343eea61bd55b7c00	In-use	Bugfix		54		[0123..0124]
 
 0001-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.				Feature		26		0001, 0012, 0013
