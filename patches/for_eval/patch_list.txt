@@ -129,5 +129,6 @@
 0123-cxgb4-cxgb4vf-Add-support-for-SGE-doorbell-queue-tim.patch		543a1b85e734d2ec62e5df61641e8ea7349de4a8 	In-use	Bugfix		54		[0123..0124]
 0124-cxgb4-Add-capability-to-get-set-SGE-Doorbell-Queue-T.patch		d429005fdf2c9da19429c8b343eea61bd55b7c00	In-use	Bugfix		54		[0123..0124]
 0125-cxgb4-add-support-to-display-DCB-info.patch			ebddd97afb89cb1e88cc037aef2913ad4723a59f		Bugfix		73		0001
+0126-cxgb4-Removing-re-occurant-logs-which-provide-inform.patch		< Not upstream >				In-use	Bugfix				0001
 
 0001-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.				Feature		26		0001, 0012, 0013
