@@ -1,0 +1,88 @@
+From 68b12d87d9adfca5ca5ddf82927126a63b7e3a56 Mon Sep 17 00:00:00 2001
+From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date: Mon, 23 Mar 2020 13:26:00 -0400
+Subject: [PATCH 129/130] cxgb4: fix throughput drop during Tx backpressure
+
+commit 7affd80802afb6ca92dba47d768632fbde365241
+Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date:   Thu Mar 19 23:08:09 2020 +0530
+
+    cxgb4: fix throughput drop during Tx backpressure
+
+    commit 7c3bebc3d868 ("cxgb4: request the TX CIDX updates to status page")
+    reverted back to getting Tx CIDX updates via DMA, instead of interrupts,
+    introduced by commit d429005fdf2c ("cxgb4/cxgb4vf: Add support for SGE
+    doorbell queue timer")
+
+    However, it missed reverting back several code changes where Tx CIDX
+    updates are not explicitly requested during backpressure when using
+    interrupt mode. These missed changes cause slow recovery during
+    backpressure because the corresponding interrupt no longer comes and
+    hence results in Tx throughput drop.
+
+    So, revert back these missed code changes, as well, which will allow
+    explicitly requesting Tx CIDX updates when backpressure happens.
+    This enables the corresponding interrupt with Tx CIDX update message
+    to get generated and hence speed up recovery and restore back
+    throughput.
+
+    Fixes: 7c3bebc3d868 ("cxgb4: request the TX CIDX updates to status page")
+    Fixes: d429005fdf2c ("cxgb4/cxgb4vf: Add support for SGE doorbell queue timer")
+    Signed-off-by: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/chelsio/cxgb4/sge.c | 31 +-----------------------
+ 1 file changed, 1 insertion(+), 30 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+index f80e98d1..03ca3468 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+@@ -1259,16 +1259,7 @@ out_free:	dev_kfree_skb_any(skb);
+ 		 * has opened up.
+ 		 */
+ 		eth_txq_stop(q);
+-
+-		/* If we're using the SGE Doorbell Queue Timer facility, we
+-		 * don't need to ask the Firmware to send us Egress Queue CIDX
+-		 * Updates: the Hardware will do this automatically.  And
+-		 * since we send the Ingress Queue CIDX Updates to the
+-		 * corresponding Ethernet Response Queue, we'll get them very
+-		 * quickly.
+-		 */
+-		if (!q->dbqt)
+-			wr_mid |= FW_WR_EQUEQ_F | FW_WR_EQUIQ_F;
++		wr_mid |= FW_WR_EQUEQ_F | FW_WR_EQUIQ_F;
+ 	}
+ 
+ 	wr = (void *)&q->q.desc[q->q.pidx];
+@@ -2100,26 +2091,6 @@ static void t4_tx_completion_handler(struct sge_rspq *rspq,
+ 	}
+ 
+ 	txq = &s->ethtxq[pi->first_qset + rspq->idx];
+-
+-	/* We've got the Hardware Consumer Index Update in the Egress Update
+-	 * message.  If we're using the SGE Doorbell Queue Timer mechanism,
+-	 * these Egress Update messages will be our sole CIDX Updates we get
+-	 * since we don't want to chew up PCIe bandwidth for both Ingress
+-	 * Messages and Status Page writes.  However, The code which manages
+-	 * reclaiming successfully DMA'ed TX Work Requests uses the CIDX value
+-	 * stored in the Status Page at the end of the TX Queue.  It's easiest
+-	 * to simply copy the CIDX Update value from the Egress Update message
+-	 * to the Status Page.  Also note that no Endian issues need to be
+-	 * considered here since both are Big Endian and we're just copying
+-	 * bytes consistently ...
+-	 */
+-	if (txq->dbqt) {
+-		struct cpl_sge_egr_update *egr;
+-
+-		egr = (struct cpl_sge_egr_update *)rsp;
+-		WRITE_ONCE(txq->q.stat->cidx, egr->cidx);
+-	}
+-
+ 	t4_sge_eth_txq_egress_update(adapter, txq, -1);
+ }
+ 
+-- 
+2.24.0
+
