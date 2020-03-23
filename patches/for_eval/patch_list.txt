@@ -133,5 +133,6 @@
 0127-iw_cxgb4-always-disconnect-when-transitioning-to-TER.patch		d2c33370ae73105c7c7df8f7048d20653991b4cb	In-use	Bugfix		81		0001
 0128-cxgb4-request-the-TX-CIDX-updates-to-status-page.patch		7c3bebc3d8688b84795c11848c314a2fbfe045e0		Bugfix		83		0001, 0123, 0124
 0129-cxgb4-fix-throughput-drop-during-Tx-backpressure.patch		7affd80802afb6ca92dba47d768632fbde365241		Bugfix		98		0001, 0123, 0124, 0128,
+0130-cxgb4-fix-Txq-restart-check-during-backpressure.patch		f1f20a8666c55cb534b8f3fc1130eebf01a06155		Bugfix		98		0001, 0123, 0124
 
 0001-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.				Feature		26		0001, 0012, 0013
