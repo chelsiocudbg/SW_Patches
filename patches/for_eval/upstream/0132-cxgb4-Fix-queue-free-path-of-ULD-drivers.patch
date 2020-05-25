@@ -1,0 +1,41 @@
+From 3e6b575ada1108e6efebd539e310e1baa5de73a6 Mon Sep 17 00:00:00 2001
+From: Potnuri Bharat Teja <bharat@chelsio.com>
+Date: Mon, 25 May 2020 19:39:50 +0530
+Subject: [PATCH 132/135] cxgb4: Fix queue free path of ULD drivers
+
+commit d7cb44496a9bb458632cb3c18acb08949c210448
+Author: Arjun Vynipadath <arjun@chelsio.com>
+Date:   Thu Mar 15 17:34:14 2018 +0530
+
+    cxgb4: Fix queue free path of ULD drivers
+
+    Setting sge_uld_rxq_info to NULL in free_queues_uld().
+    We are referencing sge_uld_rxq_info in cxgb_up(). This
+    will fix a panic when interface is brought up after a
+    ULDq creation failure.
+
+    Fixes: 94cdb8bb993a (cxgb4: Add support for dynamic allocation
+           of resources for ULD)
+    Signed-off-by: Arjun Vynipadath <arjun@chelsio.com>
+    Signed-off-by: Casey Leedom <leedom@chelsio.com>
+    Signed-off-by: Ganesh Goudhar <ganeshgr@chelsio.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.c
+index eb913a2fa2ba..15957fd8ac32 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.c
+@@ -344,6 +344,7 @@ static void free_queues_uld(struct adapter *adap, unsigned int uld_type)
+ {
+ 	struct sge_uld_rxq_info *rxq_info = adap->sge.uld_rxq_info[uld_type];
+ 
++	adap->sge.uld_rxq_info[uld_type] = NULL;
+ 	kfree(rxq_info->rspq_id);
+ 	kfree(rxq_info->uldrxq);
+ 	kfree(rxq_info);
+-- 
+2.24.0
+
