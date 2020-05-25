@@ -1,0 +1,42 @@
+From 0fef027502fd2d3df5ad6a0daa93b59b3984af49 Mon Sep 17 00:00:00 2001
+From: Potnuri Bharat Teja <bharat@chelsio.com>
+Date: Mon, 25 May 2020 19:24:47 +0530
+Subject: [PATCH 131/135] cxgb4: Remove redundant code in t4_uld_clean_up()
+
+commit f3caf8618bce7e86c6f4f86785dd004c71b63a2d
+Author: Ganesh Goudar <ganeshgr@chelsio.com>
+Date:   Thu Feb 16 12:27:15 2017 +0530
+
+    cxgb4: Remove redundant code in t4_uld_clean_up()
+
+    Remove variable rxq_info and also remove redundant assignment
+    to it.
+
+    Signed-off-by: Ganesh Goudar <ganeshgr@chelsio.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.c
+index 875d89813850..eb913a2fa2ba 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.c
+@@ -618,14 +618,12 @@ static void cxgb4_shutdown_uld_adapter(struct adapter *adap, enum cxgb4_uld type
+ 
+ void t4_uld_clean_up(struct adapter *adap)
+ {
+-	struct sge_uld_rxq_info *rxq_info;
+ 	unsigned int i;
+ 
+ 	mutex_lock(&uld_mutex);
+ 	for (i = 0; i < CXGB4_ULD_MAX; i++) {
+ 		if (!adap->uld[i].handle)
+ 			continue;
+-		rxq_info = adap->sge.uld_rxq_info[i];
+ 
+ 		cxgb4_shutdown_uld_adapter(adap, i);
+ 	}
+-- 
+2.24.0
+
