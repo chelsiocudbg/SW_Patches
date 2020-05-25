@@ -137,5 +137,6 @@
 0131-cxgb4-Remove-redundant-code-in-t4_uld_clean_up.patch		f3caf8618bce7e86c6f4f86785dd004c71b63a2d		Bugfix		100
 0132-cxgb4-Fix-queue-free-path-of-ULD-drivers.patch                     d7cb44496a9bb458632cb3c18acb08949c210448                Bugfix          100
 0133-cxgb4-fix-the-error-path-of-cxgb4_uld_register.patch               40b06553c906a56ae31677b3ecbd49546947698d                Bugfix          100
+0134-cxgb4-Fix-out-of-bounds-MSI-X-info-array-access.patch              6b517374f4ea5a3c6e307e1219ec5f35d42e6d00                Bugfix          100
 
 0001-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.				Feature		26		0001, 0012, 0013
