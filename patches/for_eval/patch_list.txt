@@ -139,5 +139,6 @@
 0133-cxgb4-fix-the-error-path-of-cxgb4_uld_register.patch               40b06553c906a56ae31677b3ecbd49546947698d                Bugfix          100
 0134-cxgb4-Fix-out-of-bounds-MSI-X-info-array-access.patch              6b517374f4ea5a3c6e307e1219ec5f35d42e6d00                Bugfix          100
 0135-cxgb4-fix-panic-when-attaching-to-ULD-fail.patch                   fc89cc358fb64e2429aeae0f37906126636507ec                Bugfix          100
+0136-cxgb4-add-adapter-hotplug-support-for-ULDs.patch			93a09e74574b2b75319938ef4155fe841335e436		Feature		100		0131, 0132, 0133, 0134, 0135
 
 0001-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.				Feature		26		0001, 0012, 0013
