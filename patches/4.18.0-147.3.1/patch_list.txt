@@ -1,0 +1,7 @@
+		Patch Name								Commit-ID			Status	Bugfix/Feature	Bug		Dependent Patches
+
+0001-SVC-malloc-changes.patch												In-use
+
+0126-cxgb4-Removing-re-occurant-logs-which-provide-inform.patch		< Not upstream >				In-use	Bugfix				0001
+
+0001-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.				Feature		26		0001, 0012, 0013
