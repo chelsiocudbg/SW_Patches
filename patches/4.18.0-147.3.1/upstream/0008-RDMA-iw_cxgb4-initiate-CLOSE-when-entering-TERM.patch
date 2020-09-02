@@ -1,4 +1,4 @@
-From 2ea6704cb2b2301b339fafb237b1b4a8711493c3 Mon Sep 17 00:00:00 2001
+From ec629cede8c7333b43f7770e4bc8e599a201d8c4 Mon Sep 17 00:00:00 2001
 From: Potnuri Bharat Teja <bharat@chelsio.com>
 Date: Mon, 10 Aug 2020 18:57:50 +0530
 Subject: [PATCH 8/9] RDMA/iw_cxgb4: initiate CLOSE when entering TERM

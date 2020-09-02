@@ -1,4 +1,4 @@
-From 3d0367de6b56abe3c1e6a9ba8f6b192fc2ab301c Mon Sep 17 00:00:00 2001
+From bc6cbe34f82796cf7bbd0e22cfc6bd52ef70f91c Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Mon, 23 Mar 2020 13:28:57 -0400
 Subject: [PATCH 4/9] cxgb4: fix Txq restart check during backpressure

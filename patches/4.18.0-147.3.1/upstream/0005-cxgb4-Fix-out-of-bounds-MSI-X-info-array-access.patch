@@ -1,4 +1,4 @@
-From 2a626fbeeea61ce31923665c3afd4bd74e89932e Mon Sep 17 00:00:00 2001
+From 4ada6b584af91302048f257e9d977db98129984b Mon Sep 17 00:00:00 2001
 From: Potnuri Bharat Teja <bharat@chelsio.com>
 Date: Mon, 25 May 2020 19:47:13 +0530
 Subject: [PATCH 5/9] cxgb4:Fix out-of-bounds MSI-X info array access

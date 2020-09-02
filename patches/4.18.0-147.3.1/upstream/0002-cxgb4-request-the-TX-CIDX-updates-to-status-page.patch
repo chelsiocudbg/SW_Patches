@@ -1,4 +1,4 @@
-From 1e700b30b57cc3cd4abba9a95f6778d16baedbd1 Mon Sep 17 00:00:00 2001
+From 736eddd3001d9068f9a237fcbd389108ef4f4811 Mon Sep 17 00:00:00 2001
 From: Raju Rangoju <rajur@chelsio.com>
 Date: Wed, 23 Oct 2019 23:03:55 +0530
 Subject: [PATCH 2/9] cxgb4: request the TX CIDX updates to status page

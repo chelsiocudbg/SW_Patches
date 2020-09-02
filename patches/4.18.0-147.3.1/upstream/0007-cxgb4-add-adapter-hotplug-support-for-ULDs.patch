@@ -1,4 +1,4 @@
-From 7c664a83add92d3f13707cd6fe5fc75cea200f86 Mon Sep 17 00:00:00 2001
+From 44fefcb1dc41434cef9ab42622a9eff7b8d8d8e5 Mon Sep 17 00:00:00 2001
 From: Potnuri Bharat Teja <bharat@chelsio.com>
 Date: Mon, 31 Aug 2020 19:25:06 +0530
 Subject: [PATCH 7/9] cxgb4: add adapter hotplug support for ULDs
@@ -77,7 +77,7 @@ index c4b94d6cd911..f513fde18ff7 100644
  	if (!is_t4(adapter->params.chip))
  		cxgb4_ptp_init(adapter);
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.c
-index 96d2b7806e28..35db72171127 100644
+index 96d2b7806e28..e31dab740e86 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.c
 @@ -711,6 +711,69 @@ static int uld_attach(struct adapter *adap, unsigned int uld)
@@ -101,13 +101,13 @@ index 96d2b7806e28..35db72171127 100644
 +	ret = setup_sge_queues_uld(adap, type, p->lro);
 +	if (ret)
 +		goto free_queues;
-+	if (adap->flags & USING_MSIX) {
++	if (adap->flags & CXGB4_USING_MSIX) {
 +		name_msix_vecs_uld(adap, type);
 +		ret = request_msix_queue_irqs_uld(adap, type);
 +		if (ret)
 +			goto free_rxq;
 +	}
-+	if (adap->flags & FULL_INIT_DONE)
++	if (adap->flags & CXGB4_FULL_INIT_DONE)
 +		enable_rx_uld(adap, type);
 +	if (adap->uld[type].add)
 +		goto free_irq;
@@ -122,9 +122,9 @@ index 96d2b7806e28..35db72171127 100644
 +free_txq:
 +	release_sge_txq_uld(adap, type);
 +free_irq:
-+	if (adap->flags & FULL_INIT_DONE)
++	if (adap->flags & CXGB4_FULL_INIT_DONE)
 +		quiesce_rx_uld(adap, type);
-+	if (adap->flags & USING_MSIX)
++	if (adap->flags & CXGB4_USING_MSIX)
 +		free_msix_queue_irqs_uld(adap, type);
 +free_rxq:
 +	free_sge_queues_uld(adap, type);
