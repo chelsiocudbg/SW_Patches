@@ -2,14 +2,16 @@
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ./upstream/:
 0001-cxgb4-Removing-re-occurant-logs-which-provide-inform.patch		< Not upstream >                                In-use  Bugfix
-0002-cxgb4-request-the-TX-CIDX-updates-to-status-page.patch		7c3bebc3d8688b84795c11848c314a2fbfe045e0		Bugfix		83
-0003-cxgb4-fix-throughput-drop-during-Tx-backpressure.patch		7affd80802afb6ca92dba47d768632fbde365241		Bugfix		98              0002
 0004-cxgb4-fix-Txq-restart-check-during-backpressure.patch		f1f20a8666c55cb534b8f3fc1130eebf01a06155	In-use	Bugfix		98
 0005-cxgb4-Fix-out-of-bounds-MSI-X-info-array-access.patch		6b517374f4ea5a3c6e307e1219ec5f35d42e6d00		Bugfix		100
 0006-cxgb4-fix-panic-when-attaching-to-ULD-fail.patch			fc89cc358fb64e2429aeae0f37906126636507ec		Bugfix		100
 0007-cxgb4-add-adapter-hotplug-support-for-ULDs.patch			93a09e74574b2b75319938ef4155fe841335e436		Feature		100             0005, 0006
 0008-RDMA-iw_cxgb4-initiate-CLOSE-when-entering-TERM.patch		d219face9059f38ad187bde133451a2a308fdb7c	In-use	Bugfix
 0009-RDMA-iw_cxgb4-Avoid-freeing-skb-twice-in-arp-failure.patch 	d4934f45693651ea15357dd6c7c36be28b6da884	In-use	Bugfix		102
+
+./upstream/dma_tx_completions/:
+0002-cxgb4-request-the-TX-CIDX-updates-to-status-page.patch		7c3bebc3d8688b84795c11848c314a2fbfe045e0		Bugfix		83
+0003-cxgb4-fix-throughput-drop-during-Tx-backpressure.patch		7affd80802afb6ca92dba47d768632fbde365241		Bugfix		98              0002
 
 ./cudbg/:
 0001-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.				Feature		26
