@@ -1,0 +1,1 @@
+wget https://vault.centos.org/8.2.2004/BaseOS/Source/SPackages/kernel-4.18.0-193.28.1.el8_2.src.rpm
