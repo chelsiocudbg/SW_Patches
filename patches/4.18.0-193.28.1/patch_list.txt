@@ -9,6 +9,7 @@
 0008-RDMA-iw_cxgb4-Avoid-freeing-skb-twice-in-arp-failure.patch 	d4934f45693651ea15357dd6c7c36be28b6da884	In-use	Bugfix		102
 0009-cxgb4-enable-interrupt-based-Tx-completions-for-T5.patch		b660bccbc345b001a13e0df29a723d2612419d91	In-use	Bugfix		111
 0010-RDMA-cxgb4-Fix-adapter-LE-hash-errors-while-destroyi.patch		3408be145a5d6418ff955fe5badde652be90e700	In-use	Bugfix		117
+0011-cxgb4-avoid-collecting-SGE_QBASE-regs-during-traffic.patch		1bfb3dea965ff9f6226fd1709338f227363b6061	In-use	Bugfix		104
 
 ./upstream/dma_tx_completions/:
 0002-cxgb4-request-the-TX-CIDX-updates-to-status-page.patch		7c3bebc3d8688b84795c11848c314a2fbfe045e0		Bugfix		83
