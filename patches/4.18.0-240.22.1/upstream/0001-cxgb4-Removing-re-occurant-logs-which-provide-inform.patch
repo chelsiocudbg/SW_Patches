@@ -1,0 +1,30 @@
+From dfe250da4a56c25fa88909f9b174eb0a7f436ed5 Mon Sep 17 00:00:00 2001
+From: Potnuri Bharat Teja <bharat@chelsio.com>
+Date: Tue, 26 Mar 2019 12:37:38 +0530
+Subject: [PATCH 1/6] cxgb4: Removing re-occurant logs which provide
+ information of non-VLAN Tag on DCB Link
+
+Note: This print is still valid, but may not need in out current use case.
+
+Signed-off-by: Potnuri Bharat Teja <bharat@chelsio.com>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index f80a43d31..a0e530ea0 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -1144,9 +1144,6 @@ static u16 cxgb_select_queue(struct net_device *dev, struct sk_buff *skb,
+ 
+ 		err = vlan_get_tag(skb, &vlan_tci);
+ 		if (unlikely(err)) {
+-			if (net_ratelimit())
+-				netdev_warn(dev,
+-					    "TX Packet without VLAN Tag on DCB Link\n");
+ 			txq = 0;
+ 		} else {
+ 			txq = (vlan_tci & VLAN_PRIO_MASK) >> VLAN_PRIO_SHIFT;
+-- 
+2.28.0
+
