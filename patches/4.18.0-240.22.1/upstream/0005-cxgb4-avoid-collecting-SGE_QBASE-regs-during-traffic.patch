@@ -1,7 +1,7 @@
-From 114e498cac919f0df492fb9f438d8912111069c2 Mon Sep 17 00:00:00 2001
+From 24da29eeb94584b7bbf8fcfce7df6a6b44fc5652 Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Sat, 27 Mar 2021 19:57:28 +0530
-Subject: [PATCH 6/6] cxgb4: avoid collecting SGE_QBASE regs during traffic
+Subject: [PATCH 5/7] cxgb4: avoid collecting SGE_QBASE regs during traffic
 
 commit 1bfb3dea965ff9f6226fd1709338f227363b6061
 Author: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
@@ -23,7 +23,7 @@ Date:   Sat Mar 27 23:49:08 2021 +0530
  2 files changed, 21 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c b/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
-index 3ae3c6f47..a91a0b9f6 100644
+index 3ae3c6f47e50..a91a0b9f6abc 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
 @@ -1400,11 +1400,25 @@ int cudbg_collect_sge_indirect(struct cudbg_init *pdbg_init,
@@ -66,7 +66,7 @@ index 3ae3c6f47..a91a0b9f6 100644
  		/* 1 addr reg SGE_QBASE_INDEX and 4 data reg
  		 * SGE_QBASE_MAP[0-3]
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
-index 974eb76d2..59fad2bf5 100644
+index 974eb76d29a1..59fad2bf56ed 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
 @@ -2090,7 +2090,8 @@ void t4_get_regs(struct adapter *adap, void *buf, size_t buf_size)
@@ -80,5 +80,5 @@ index 974eb76d2..59fad2bf5 100644
  		0x1800, 0x18fc,
  		0x3000, 0x302c,
 -- 
-2.28.0
+2.24.0
 

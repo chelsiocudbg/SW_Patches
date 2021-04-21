@@ -2,8 +2,9 @@
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ./upstream/:
 0001-cxgb4-Removing-re-occurant-logs-which-provide-inform.patch		< Not upstream >                                In-use  Bugfix
-0005-RDMA-cxgb4-Fix-adapter-LE-hash-errors-while-destroyi.patch		3408be145a5d6418ff955fe5badde652be90e700	In-use	Bugfix		117
-0006-cxgb4-avoid-collecting-SGE_QBASE-regs-during-traffic.patch		1bfb3dea965ff9f6226fd1709338f227363b6061	In-use	Bugfix		104
+0005-cxgb4-avoid-collecting-SGE_QBASE-regs-during-traffic.patch		1bfb3dea965ff9f6226fd1709338f227363b6061	In-use	Bugfix		104
+0006-RDMA-cxgb4-Fix-adapter-LE-hash-errors-while-destroyi.patch		3408be145a5d6418ff955fe5badde652be90e700	In-use	Bugfix		117
+0007-RDMA-cxgb4-check-for-ipv6-address-properly-while-des.patch		603c4690b01aaffe3a6c3605a429f6dac39852ae	In-use	Bugfix		117		0006
 
 ./upstream/interrupt_tx_completions/:
 0002-Revert-cxgb4-request-the-TX-CIDX-updates-to-status-p.patch		7c3bebc3d8688b84795c11848c314a2fbfe045e0	In-use	Bugfix		83

@@ -1,7 +1,7 @@
-From ba5987fb3a9fb7d395755ec85f1955f2f8d10510 Mon Sep 17 00:00:00 2001
+From b7a1565dec7fa5176a472353c5ade8039d4f5212 Mon Sep 17 00:00:00 2001
 From: Potnuri Bharat Teja <bharat@chelsio.com>
 Date: Thu, 25 Mar 2021 00:34:53 +0530
-Subject: [PATCH 5/6] RDMA/cxgb4: Fix adapter LE hash errors while destroying
+Subject: [PATCH 6/7] RDMA/cxgb4: Fix adapter LE hash errors while destroying
  ipv6 listening server
 
 commit 3408be145a5d6418ff955fe5badde652be90e700 (HEAD, upstream/wip/jgg-for-rc, upstream/for-rc)
@@ -25,7 +25,7 @@ Date:   Thu Mar 25 00:34:53 2021 +0530
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
-index bad2e1a33..4f29f1419 100644
+index bad2e1a33032..4f29f1419b82 100644
 --- a/drivers/infiniband/hw/cxgb4/cm.c
 +++ b/drivers/infiniband/hw/cxgb4/cm.c
 @@ -3596,13 +3596,13 @@ int c4iw_destroy_listen(struct iw_cm_id *cm_id)
@@ -45,5 +45,5 @@ index bad2e1a33..4f29f1419 100644
  			goto done;
  		err = c4iw_wait_for_reply(&ep->com.dev->rdev, ep->com.wr_waitp,
 -- 
-2.28.0
+2.24.0
 
