@@ -1,0 +1,48 @@
+From 96c008ef0d637c7d30f8064e07edaaa5157095e3 Mon Sep 17 00:00:00 2001
+From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date: Tue, 29 Mar 2022 05:49:16 +0530
+Subject: [PATCH 09/12] PCI/ERR: Retain status from error notification
+
+commit 387c72cdd7fb6bef650fb078d0f6ae9682abf631
+Author: Keith Busch <kbusch@kernel.org>
+Date:   Mon Jan 4 15:02:58 2021 -0800
+
+    PCI/ERR: Retain status from error notification
+
+    Overwriting the frozen detected status with the result of the link reset
+    loses the NEED_RESET result that drivers are depending on for error
+    handling to report the .slot_reset() callback. Retain this status so
+    that subsequent error handling has the correct flow.
+
+    Link: https://lore.kernel.org/r/20210104230300.1277180-4-kbusch@kernel.org
+    Reported-by: Hinko Kocevar <hinko.kocevar@ess.eu>
+    Tested-by: Hedi Berriche <hedi.berriche@hpe.com>
+    Signed-off-by: Keith Busch <kbusch@kernel.org>
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+    Acked-by: Sean V Kelley <sean.v.kelley@intel.com>
+    Acked-by: Hedi Berriche <hedi.berriche@hpe.com>
+
+This commit is essentially a revert of following earlier commit:
+
+6d2c89441571 ("PCI/ERR: Update error status after reset_link()")
+---
+ drivers/pci/pcie/err.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/pci/pcie/err.c b/drivers/pci/pcie/err.c
+index 14bb8f547..84f723422 100644
+--- a/drivers/pci/pcie/err.c
++++ b/drivers/pci/pcie/err.c
+@@ -165,8 +165,7 @@ pci_ers_result_t pcie_do_recovery(struct pci_dev *dev,
+ 	pci_dbg(dev, "broadcast error_detected message\n");
+ 	if (state == pci_channel_io_frozen) {
+ 		pci_walk_bus(bus, report_frozen_detected, &status);
+-		status = reset_link(dev);
+-		if (status != PCI_ERS_RESULT_RECOVERED) {
++		if (reset_link(dev) != PCI_ERS_RESULT_RECOVERED) {
+ 			pci_warn(dev, "link reset failed\n");
+ 			goto failed;
+ 		}
+-- 
+2.28.0
+

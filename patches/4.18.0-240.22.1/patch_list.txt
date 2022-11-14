@@ -6,6 +6,10 @@
 0006-RDMA-cxgb4-Fix-adapter-LE-hash-errors-while-destroyi.patch		3408be145a5d6418ff955fe5badde652be90e700	In-use	Bugfix		117
 0007-RDMA-cxgb4-check-for-ipv6-address-properly-while-des.patch		603c4690b01aaffe3a6c3605a429f6dac39852ae	In-use	Bugfix		117		0006
 0008-cxgb4-fix-eeprom-len-when-diagnostics-not-implemente.patch		4ca110bf8d9b31a60f8f8ff6706ea147d38ad97c	In-use	Bugfix		130
+0009-PCI-ERR-Retain-status-from-error-notification.patch		387c72cdd7fb6bef650fb078d0f6ae9682abf631	In-use	Bugfix		140
+0010-cxgb4-avoid-accessing-registers-when-clearing-filter.patch		88c380df84fbd03f9b137c2b9d0a44b9f2f553b0	In-use	Bugfix		140
+0011-cxgb4-fix-IRQ-free-race-during-driver-unload.patch			015fe6fd29c4b9ac0f61b8c4455ef88e6018b9cc	In-use	Bugfix		140
+0012-cxgb4-rework-PCIe-error-handling.patch				< Not yet upstream >				In-use	Bugfix		140		0011
 
 ./upstream/interrupt_tx_completions/:
 0002-Revert-cxgb4-request-the-TX-CIDX-updates-to-status-p.patch		7c3bebc3d8688b84795c11848c314a2fbfe045e0	In-use	Bugfix		83
