@@ -1,0 +1,15 @@
+		Patch Name								Commit-ID			Status	Bugfix/Feature	Bug		Dependent Patches
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+./upstream/:
+0001-cxgb4-Removing-re-occurant-logs-which-provide-inform.patch		< Not upstream >                                In-use  Bugfix
+0004-cxgb4-fix-eeprom-len-when-diagnostics-not-implemente.patch		4ca110bf8d9b31a60f8f8ff6706ea147d38ad97c	In-use	Bugfix		130
+0005-cxgb4-avoid-accessing-registers-when-clearing-filter.patch		88c380df84fbd03f9b137c2b9d0a44b9f2f553b0	In-use	Bugfix		140
+0006-cxgb4-fix-IRQ-free-race-during-driver-unload.patch			015fe6fd29c4b9ac0f61b8c4455ef88e6018b9cc	In-use	Bugfix		140
+0007-cxgb4-rework-PCIe-error-handling.patch				< Not yet upstream >				In-use	Bugfix		140
+
+./upstream/interrupt_tx_completions/:
+0002-Revert-cxgb4-request-the-TX-CIDX-updates-to-status-p.patch		7c3bebc3d8688b84795c11848c314a2fbfe045e0	In-use	Bugfix		83
+0003-Revert-cxgb4-fix-throughput-drop-during-Tx-backpress.patch		7affd80802afb6ca92dba47d768632fbde365241	In-use	Bugfix		98              0002
+
+./cudbg/:
+0001-cxgb4-speed-up-on-chip-memory-collection.patch			Not available in upstream.				Feature		26
