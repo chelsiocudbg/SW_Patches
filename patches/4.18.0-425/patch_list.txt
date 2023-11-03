@@ -3,6 +3,7 @@
 ./upstream/:
 0001-cxgb4-Removing-re-occurant-logs-which-provide-inform.patch		< Not upstream >                                In-use  Bugfix
 0004-cxgb4-rework-PCIe-error-handling.patch				< Not yet upstream >				In-use	Bugfix		140
+0005-cxgb4-reduce-tc-mqprio-max-queues.patch				< Not yet upstream >				In-use	Bugfix		180		0004
 
 ./upstream/interrupt_tx_completions/:
 0002-Revert-cxgb4-request-the-TX-CIDX-updates-to-status-p.patch		7c3bebc3d8688b84795c11848c314a2fbfe045e0	In-use	Bugfix		83

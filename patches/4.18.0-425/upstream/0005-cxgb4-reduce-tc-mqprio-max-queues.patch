@@ -1,0 +1,45 @@
+From 240fbe6feb3c7f128813ab46969bc544268bebf7 Mon Sep 17 00:00:00 2001
+From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+Date: Fri, 3 Nov 2023 18:49:14 +0530
+Subject: [PATCH 5/5] cxgb4: reduce tc-mqprio max queues
+
+Reduce tc-mqprio max queues to 1024 to reduce memory footprint.
+
+Signed-off-by: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index c85ea8268..c5c65aef0 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -4201,6 +4201,7 @@ static int adap_config_hma(struct adapter *adapter)
+  * Max # of ATIDs.  The absolute HW max is 16K but we keep it lower.
+  */
+ #define MAX_ATIDS 8192U
++#define MAX_EOTIDS 1024U
+ 
+ /*
+  * Phase 0 of initialization: contact FW, obtain config, perform basic init.
+@@ -5161,7 +5162,7 @@ static int adap_init0(struct adapter *adap, bool vpd_skip)
+ 					      params, val);
+ 			if (!ret) {
+ 				adap->tids.eotid_base = val[0];
+-				adap->tids.neotids = min_t(u32, MAX_ATIDS,
++				adap->tids.neotids = min_t(u32, MAX_EOTIDS,
+ 							   val[1] - val[0] + 1);
+ 				adap->params.ethofld = 1;
+ 			}
+@@ -6559,7 +6560,7 @@ static int cxgb4_adap_init(struct adapter *adap, bool vpd_skip)
+ 		 * know the actual # of EOTIDs supported.
+ 		 */
+ 		netdev = alloc_etherdev_mq(sizeof(struct port_info),
+-					   MAX_ETH_QSETS + MAX_ATIDS);
++					   MAX_ETH_QSETS + MAX_EOTIDS);
+ 		if (!netdev) {
+ 			err = -ENOMEM;
+ 			goto out_free_resources;
+-- 
+2.31.1
+
