@@ -1,42 +1,75 @@
-From 240fbe6feb3c7f128813ab46969bc544268bebf7 Mon Sep 17 00:00:00 2001
+From 237ee4e1da2d71a67f56ea815ec77b8194f2f086 Mon Sep 17 00:00:00 2001
 From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 Date: Fri, 3 Nov 2023 18:49:14 +0530
 Subject: [PATCH 5/5] cxgb4: reduce tc-mqprio max queues
 
-Reduce tc-mqprio max queues to 1024 to reduce memory footprint.
+Reduce tc-mqprio max queues to 1024 to reduce memory footprint. Also
+add max_mqprio_queues module parameter to control how many to allocate
+during probe.
 
 Signed-off-by: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
 ---
- drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ .../net/ethernet/chelsio/cxgb4/cxgb4_main.c   | 29 +++++++++++++++++--
+ 1 file changed, 26 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index c85ea8268..c5c65aef0 100644
+index c85ea8268..6bb1672c1 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-@@ -4201,6 +4201,7 @@ static int adap_config_hma(struct adapter *adapter)
-  * Max # of ATIDs.  The absolute HW max is 16K but we keep it lower.
-  */
- #define MAX_ATIDS 8192U
-+#define MAX_EOTIDS 1024U
+@@ -179,12 +179,32 @@ module_param(select_queue, int, 0644);
+ MODULE_PARM_DESC(select_queue,
+ 		 "Select between kernel provided method of selecting or driver method of selecting TX queue. Default is kernel method.");
  
- /*
-  * Phase 0 of initialization: contact FW, obtain config, perform basic init.
-@@ -5161,7 +5162,7 @@ static int adap_init0(struct adapter *adap, bool vpd_skip)
++/* Maximum number of queues for tc-mqprio offload per port.
++ *
++ * Default: max_mqprio_queues=1024
++ */
++#define MAX_EOTIDS 8192U
++#define DEFAULT_EOTIDS 1024U
++
++static uint max_mqprio_queues = DEFAULT_EOTIDS;
++module_param(max_mqprio_queues, uint, 0644);
++MODULE_PARM_DESC(max_mqprio_queues,
++		 "Set maximum number of queues for tc-mqprio offload. Default=1024, Max=8192, Disable=0.");
++
+ static struct dentry *cxgb4_debugfs_root;
+ 
+ LIST_HEAD(adapter_list);
+ DEFINE_MUTEX(uld_mutex);
+ LIST_HEAD(uld_list);
+ 
++static u32 cxgb4_modparam_max_mqprio_queues(void)
++{
++	if (max_mqprio_queues > MAX_EOTIDS)
++		max_mqprio_queues = MAX_EOTIDS;
++
++	return max_mqprio_queues;
++}
++
+ static int cfg_queues(struct adapter *adap);
+ 
+ static void link_report(struct net_device *dev)
+@@ -5161,9 +5181,11 @@ static int adap_init0(struct adapter *adap, bool vpd_skip)
  					      params, val);
  			if (!ret) {
  				adap->tids.eotid_base = val[0];
 -				adap->tids.neotids = min_t(u32, MAX_ATIDS,
-+				adap->tids.neotids = min_t(u32, MAX_EOTIDS,
++				adap->tids.neotids = min_t(u32,
++							   cxgb4_modparam_max_mqprio_queues(),
  							   val[1] - val[0] + 1);
- 				adap->params.ethofld = 1;
+-				adap->params.ethofld = 1;
++				if (adap->tids.neotids)
++					adap->params.ethofld = 1;
  			}
-@@ -6559,7 +6560,7 @@ static int cxgb4_adap_init(struct adapter *adap, bool vpd_skip)
+ 		}
+ 	}
+@@ -6559,7 +6581,8 @@ static int cxgb4_adap_init(struct adapter *adap, bool vpd_skip)
  		 * know the actual # of EOTIDs supported.
  		 */
  		netdev = alloc_etherdev_mq(sizeof(struct port_info),
 -					   MAX_ETH_QSETS + MAX_ATIDS);
-+					   MAX_ETH_QSETS + MAX_EOTIDS);
++					   MAX_ETH_QSETS +
++					   cxgb4_modparam_max_mqprio_queues());
  		if (!netdev) {
  			err = -ENOMEM;
  			goto out_free_resources;
