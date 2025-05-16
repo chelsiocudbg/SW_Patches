@@ -1,0 +1,567 @@
+                    ****************************************
+                                  RELEASE NOTES
+
+                    ****************************************
+
+                         Chelsio Terminator Firmware
+
+
+
+Overview
+================================================================================
+
+T6 Firmware
+++++++++++++
+Version : 1.27.5.0
+Date    : 05/16/2025
+================================================================================
+
+Fixes
+-----
+
+BASE:
+- Fixed handling the Remote Fault with AN, causing the link failure.
+- Handle 40G to 100G cable change.
+- Avoid unnecessary i2c read.
+- Fixed a hang if module eeprom reads gives invalid data.
+- KR backlplane no-fec link problem fixed.
+- Enabled all MA parity interrupt bits.
+- Use config file value to override number of rx channel. nrxch=1 was not
+  handled in the firmware.
+- Replaced read only registers with new registers EDC_H_BIST_USER_WDATA0,
+  EDC_H_BIST_USER_WDATA1 and EDC_H_BIST_CMD_LEN to dump the uP memory parity
+  error status registers.
+- 10G simplex module support enabled.
+- Fixed error on setting 25G speed on 100G copper with multiple FEC set in
+  firmware commands.
+- Handle link of unknown optics modules by enabling module tx unconditionally.
+- Fixed link not coming up for 25G CRS phys. Firmware incorrectly tried to
+  bring up the link in RS-FEC but as per IEEE spec, it must be BASER FEC.
+- Fixed an issue where firmware doesn't automatically retry next FEC if driver
+  asks to bring up the link using RS-FEC and link doesn't come up.
+- Fixed one module eeprom read failure.
+- Fixed an issue with speed selection when 40G and 25G are advertised and
+  supported.
+- Fixed a random traffic hang when T5 receives invalid ets BW in dcbx
+  messages from a switch.
+- Fixed very long link up time with few switches.
+- Added support for SFP+ RJ45 (0x1C).
+- Fixing backward compatibility issue with older drivers when multiple speeds
+  are passed to firmware.
+- Wait 5ms before and after the i2c command that clears the mod_select. This
+  fixes incorrect port module type read from i2c.
+- Fixed backward compatibility issue in port type interpretation with vpd
+  version 0x80.
+- Fixed Back to back T6 100G-CR4 link coming up with NO FEC sometimes.
+- Try to bring up link in 1G speed if link doesn't come up on 10G.
+- Fixed a bug to not allow BaseR fec in 100G speed.
+- Fixed linkup issues on BT adapter in 1G and 100M speed.
+- Fixed an issue to allow driver to send VI_ENABLE multiple times (once
+  with rx disable and then later rx enable).
+- Fixed rate limiting not working on class number 16 to 30.
+- Incremental timeout to handle cases where peer takes more time to link up in
+  non-AN case (fibre cable).
+- Update DCBX status when DCBX TLVs are removed from switch.
+- Treat Lookuptyp in EXACT_MAC command as "don't care".
+- Fixed PTP register misconfiguration during frequency adjustment.
+- Fixed PTP frequency adjustment scaling error.
+- Fixed passing the correct burst size value to the driver.
+- Fixed DCBx regression where DCBx local parameters appears as negotiated
+  even after removing the DCBx TLVs from switch.
+- IP masking not honored in a filter for IPv6 is fixed. New firmware command
+  FW_CLIP2_CMD is added.
+
+ETH:
+- Fixed a case when firmware failed to deliver NIC WR completion to host.
+- No rate limit support for WR ETH_TX_PKTS2 due to performance reasons.
+- Fixed a regression which was causing all ingress IPv6 packets to endup in
+  default queue.
+- Fixed setting FW_PORT_CAP32_802_3_ASM_DIR, and FW_PORT_CAP32_802_3_PAUSE
+  bits when cable is removed. This was causing flood of "Requested Port
+  Capabilities exceed Physical Port Capabilities" in driver.
+- Remove support for IPv6 site local addresses (RFC 4291, section 2.5.7
+  deprecated site local addresses).
+- 100G LR4 module's default fec is corrected to no fec.
+- 1G/10G/40G speed change request is accepted directly and FW will disable the
+  fec, it won't throw error to driver now.
+- Other fec's trial on AN duty cycle is corrected. It will now try one fec per
+  bean cycle.
+- Do not allow RS FEC in 50G speed.
+- Fixed FW_ETH_TX_PKTS2_WR not returning credits to egress/ingress queue.
+- Fixed link not coming up when toggle duration is small (less than 1 sec).
+
+OFLD:
+- iscsi ddp errors fixed.
+- iwarp connection abort in rare cases causing NIC traffic hang fixed.
+- TOE-TLS crash fixed.
+- iscsi hang fixed.
+- Do not touch tp_plen_max (unit in which firmware sends data to further
+  pipeline) if driver is supplying tp_plen_max. This fixes a connection reset
+  issue in iscsi.
+- Fixed a connection hang in SO adapters when tp_plen_max (set by driver)
+  is more than the window size.
+- Added fw_filter_vnic_mode to firmware API file (t4fw_interface.h)
+- Use correct rx channel in coprocessor crypto completion (CPL_FW6_PLD). This
+  was causing out of order completion to host.
+- Fixed a hang when connection runs into backpressure during RDMA_FINI handling.
+- [T6] Coprocessor and inline toe-tls hang issues fixed.
+- TOE-TLS: Ignore FW_ULPX_WR if connection is in close state.
+- Fixed hash filter creation issue when used with offload.
+- Fixed IPv6-UDP segmentation offload.
+
+
+
+ENHANCEMENTS
+------------
+
+BASE:
+- Cisco GLC-TE 1G modules support added.
+- Firmware header modified to add firmware binary signature.
+- [T6] Dump internal processor memory parity errors in BIST status register.
+- FW support added to enable/disable TLS offload NIC support.
+- New firmware command FW_CLIP2_CMD added to pass the ipv6 mask.
+
+ETH:
+- Rate limiting support added for encapsulated (vxlan, nvgre, geneve) NIC TCP
+  packets.
+- Multiple fecs try is made default.
+- Driver can also set one fec or multiple fecs, or disable other fecs try.
+
+OFLD:
+- More than 128 SGLs supported in FW_RI_FR_NSMR_WR. Now, more than 16GB
+  (upto 64GB) of PBLs can be written with single FW_RI_FR_NSMR_WR.
+- Disabled bottleneck bandwidth logic due to perf reason.
+
+
+================================================================================
+================================================================================
+
+
+
+Version : 1.22.0.41
+Date    : 07/29/2020
+================================================================================
+
+Fixes
+-----
+
+- Added support to try multiple FECs by default.
+
+
+
+================================================================================
+================================================================================
+
+
+
+Version : 1.22.0.4
+Date    : 02/12/2019
+================================================================================
+
+Fixes
+-----
+
+ETH:
+- Added support for SGE Doorbell Queue Timers to reduce the send completion time.
+
+
+
+================================================================================
+================================================================================
+
+
+
+Version : 1.22.0.3
+Date    : 11/02/2018
+================================================================================
+
+Fixes
+-----
+
+OFLD:
+- Fixed errors and connection drop on other connections when CRC error occurs on
+  one iwarp connection.
+
+
+
+================================================================================
+================================================================================
+
+
+
+Version : 1.22.0.2
+Date    : 10/17/2018
+================================================================================
+
+Fixes
+-----
+
+ETH:
+- Fixed link not coming up when T6 is connected to a switch which has auto
+  negotiation (AN) disabled.
+
+OFLD:
+- Fixed iwarp connection hang caused by cqe error during thepending memread
+  operation.
+
+
+
+================================================================================
+================================================================================
+
+
+
+Version : 1.21.5.0
+Date    : 09/26/2018
+================================================================================
+
+Fixes
+-----
+
+BASE:
+- Incorrect mac reference count issue fixed.
+- VF FLR resetting VLAN issue fixed.
+- Always enable PFC if ETS is configured.
+- Incosistent VF rate limiting fixed.
+
+ETH:
+- Restart auto negotiation on seeing sigdet change in fallback mode.
+- Fixes a bug where pause doesn't get enabled when enabling PFC if switch
+  doesn't support pause negotiation.
+
+OFLD:
+- Fixes a hang in offload loopback traffic on link toggle.
+- Connection hang due to CQE error after memory read fixed.
+
+FOiSCSI:
+- Ping to iscsi interface failure fixed.
+- Firmware crash while running IO and start/stop target in a loop fixed.
+
+
+Enhancements
+------------
+
+BASE:
+- Allow sending FW_TP_WR and FW_ULPTX_WR on NIC queues (needed for inline
+  NIC-TLS usecase).
+- 2 new bits, F_FW_FILTER2_WR_DROP_ENCAP to drop encapsulation header and
+  F_FW_FILTER2_WR_TX_LOOP to loopback nat'ed packets are added to
+  FW_FILTER2_WR.
+
+ETH:
+- New API FW_PARAMS_PARAM_PFVF_MAX_PKTS_PER_ETH_TX_PKTS_WR added to know the
+  max number of packets allwoed in FW_ETH_TX_PKTS_WR and FW_ETH_TX_PKTS_VM_WR.
+- Performance improvement in handling coalesced packet from VMs.
+- More than 64K ethofld flows supported.
+
+iSCSI:
+- iSCSI performance improvement on SO (memfree) adpater.
+
+
+
+================================================================================
+================================================================================
+
+
+
+Version : 1.20.8.0
+Date    : 07/06/2018
+================================================================================
+
+Fixes
+-----
+
+ETH:
+- Allows PF to access VI stats of any of its VF.
+- Fixes a bug in DCBX where dynamic ETS changes were not obeyed by fw.
+- Regression due to hpfilter fixed.
+
+OFLD:
+- Enabled 28K offload connection setup with traffic.
+
+FOiSCSI:
+- Ping response with data above 56 bytes fixed.
+- IPv6 hdr size not substracted from MSS value is fixed.
+
+
+Enhancements
+------------
+
+BASE:
+- FW_VI_MAC_CMD modified to accept loopback port number. Now MPS-TCAM entries
+  can be created for loopback port from driver.
+- FW_VI_MAC_CMD modified to query/lookup index of SMAC/DMAC address.
+
+ETH:
+- Added support for 40/100G KR.
+
+OFLD:
+- Enabled hashfilter support along with other offloads (toe/iscsi/rdma).
+
+iSCSI:
+- SO (memfree) adapter support enabled for 256 iscsi connections.
+
+
+
+================================================================================
+================================================================================
+
+
+
+Version : 1.19.1.0
+Date    : 04/23/2018
+================================================================================
+
+Fixes
+-----
+
+BASE:
+- Fixed traffic stall when rate-limit is modified while running traffic.
+- Fixes a firmware crash in FW_ETH_TX_EO_WR handling.
+- Fixes host DCB support when FW_PORT_CMD is used.
+
+ETH:
+- Exit Auto-Negotiation if we don't receive base page from peer within 10s.
+  This fixes some cases where in we keep on restarting auto negotiation without
+  ever exiting, resulting in link failure.
+- Fixes an issue where VF packets counter were not increasing if VF packets
+  coalesced WR is used by driver.
+
+OFLD:
+- Kernel and user mode NVMEoF performance enhancements.
+
+FOiSCSI:
+- Fixes fw crash when trying to connect to non-existence IPv6 iSNS target.
+
+
+
+================================================================================
+================================================================================
+
+
+
+Version : 1.18.9.0
+Date    : 03/27/2018
+================================================================================
+
+Fixes
+-----
+
+BASE:
+- Added a new parameter iqtype to FW_IQ_CMD to identify the ingress NIC or offload
+  queues. This fixes an issue where driver was receiving interrupt with no new
+  messages in queue.
+- FW_PARAMS_CMD processes all the valaid paramaters and returns value 0UL for
+  any unknown parameter.
+
+OFLD:
+- Fixes connection failure during SRQ reuse.
+- Fixes incorrect cqe in case of WRITE with immediate operation.
+
+FOiSCSI:
+- Fixes a fw crash when wrong node-id is passed to FW_FOISCSI_CTRL_WR.
+
+FOFCoE:
+- Fixes a fw hang while creating NPIV.
+
+
+Enhancements
+------------
+
+ETH:
+- A new WR FW_ETH_TX_PKTS_VM_WR added to support VM packet coalescing.
+
+
+
+T5 Firmware
+++++++++++++
+
+Version : 1.22.0.3
+Date    : 11/09/2018
+================================================================================
+
+Fixes
+-----
+
+OFLD:
+- Fixed errors and connection drop on other connections when CRC error occurs on
+  one iwarp connection.
+
+
+
+================================================================================
+================================================================================
+
+
+
+Version : 1.22.0.2
+Date    : 10/17/2018
+================================================================================
+
+Fixes
+-----
+
+OFLD:
+- Fixed iwarp connection hang caused by cqe error during thepending memread
+  operation.
+
+
+
+================================================================================
+================================================================================
+
+
+
+Version : 1.21.5.0
+Date    : 09/26/2018
+================================================================================
+
+Fixes
+-----
+
+BASE:
+- Incorrect mac reference count issue fixed.
+- VF FLR resetting VLAN issue fixed.
+- Always enable PFC if ETS is configured.
+- Incosistent VF rate limiting fixed.
+
+OFLD:
+- Connection hang due to CQE error after memory read fixed.
+
+FOiSCSI:
+- Ping to iscsi interface failure fixed.
+- Firmware crash while running IO and start/stop target in a loop fixed.
+
+
+Enhancements
+------------
+
+BASE:
+- 2 new bits, F_FW_FILTER2_WR_DROP_ENCAP to drop encapsulation header and
+  F_FW_FILTER2_WR_TX_LOOP to loopback nat'ed packets are added to
+  FW_FILTER2_WR.
+
+ETH:
+- New API FW_PARAMS_PARAM_PFVF_MAX_PKTS_PER_ETH_TX_PKTS_WR added to know the
+  max number of packets allwoed in FW_ETH_TX_PKTS_WR and FW_ETH_TX_PKTS_VM_WR.
+- Performance improvement in handling coalesced packet from VMs.
+
+
+
+================================================================================
+================================================================================
+
+
+
+Version : 1.20.8.0
+Date    : 07/06/2018
+================================================================================
+
+Fixes
+-----
+
+ETH:
+- Allows PF to access VI stats of any of its VF.
+- Fixes a bug in DCBX where dynamic ETS changes were not obeyed by fw.
+
+FOiSCSI:
+- Ping response with data above 56 bytes fixed.
+- IPv6 hdr size not substracted from MSS value is fixed.
+
+
+Enhancements
+------------
+
+BASE:
+- FW_VI_MAC_CMD modified to accept loopback port number. Now MPS-TCAM entries
+  can be created for loopback port from driver.
+- FW_VI_MAC_CMD modified to query/lookup index of SMAC/DMAC address.
+
+OFLD:
+- Enabled MSS segmentation offload support.
+
+
+
+================================================================================
+================================================================================
+
+
+
+Version : 1.19.1.0
+Date    : 04/23/2018
+================================================================================
+
+Fixes
+-----
+
+BASE:
+- Fixes a firmware crash in FW_ETH_TX_EO_WR handling.
+- Fixes host DCB support when FW_PORT_CMD is used.
+
+ETH:
+- Fixes an issue where VF packets counter were not increasing if VF packets
+  coalesced WR is used by driver.
+
+OFLD:
+- Fixes an issue where fw hangs if max traffic rate passed is 0.
+
+FOiSCSI:
+-  Fixes fw crash when trying to connect to non-existence IPv6 iSNS target.
+
+
+
+================================================================================
+================================================================================
+
+
+
+Version : 1.18.9.0
+Date    : 03/27/2018
+================================================================================
+
+Fixes
+-----
+
+BASE:
+- For Ethernet frames less than 64B, pad them with zero bytes as per IEEE spec
+  (RFC 894).
+- Added a new parameter iqtype to FW_IQ_CMD to identify the ingress NIC or offload
+  queues. This fixes an issue where driver was receiving interrupt with no new
+  messages in queue.
+
+ETH:
+- Pad the Ethernet packets of size less than 64B with zeros. This fixes the
+  incorrect checksum generation of packets less then 64B.
+
+FOiSCSI:
+- Fixes a fw crash when wrong node-id is passed to FW_FOISCSI_CTRL_WR.
+
+FOFCoE:
+- Fixes a fw hang while creating NPIV.
+
+
+Enhancements
+------------
+
+ETH:
+- A new WR FW_ETH_TX_PKTS_VM_WR added to support VM packet coalescing.
+
+
+
+
+
+
+
+
+
+********************************************************************************
+Copyright (C) 2025 Chelsio Communications. All Rights Reserved.
+
+The information in this document is furnished for informational use only, is
+subject to change without notice, and should not be construed as a commitment by
+Chelsio Communications. Chelsio Communications assumes no responsibility or
+liability for any errors or inaccuracies that may appear in this document or any
+software that may be provided in association with this document. Except as
+permitted by such license, no part of this document may be reproduced, stored in
+a retrieval system,or transmitted in any form or by any means without the
+express written consent of Chelsio Communications.
