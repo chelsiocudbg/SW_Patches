@@ -1,0 +1,1 @@
+wget https://vault.almalinux.org/10.0/BaseOS/Source/Packages/kernel-6.12.0-55.9.1.el10_0.src.rpm

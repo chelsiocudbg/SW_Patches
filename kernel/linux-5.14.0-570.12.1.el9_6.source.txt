@@ -1,0 +1,1 @@
+wget https://vault.almalinux.org/9.6/BaseOS/Source/Packages/kernel-5.14.0-570.12.1.el9_6.src.rpm
