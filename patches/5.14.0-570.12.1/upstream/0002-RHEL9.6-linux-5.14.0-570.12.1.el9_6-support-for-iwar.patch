@@ -1,7 +1,7 @@
 From 1e3d4b1bd0a10900068a6f7f8104fb3ab27d9bf7 Mon Sep 17 00:00:00 2001
 From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
 Date: Tue, 23 Dec 2025 21:07:04 -0500
-Subject: [PATCH 2/2] RHEL9.6(linux-5.14.0-570.12.1.el9_6) support for iwarp
+Subject: [PATCH 2/4] RHEL9.6(linux-5.14.0-570.12.1.el9_6) support for iwarp
 
 ---
  .config                                       |  12 +-
