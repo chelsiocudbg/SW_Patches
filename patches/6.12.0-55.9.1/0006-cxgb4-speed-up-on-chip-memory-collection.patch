@@ -1,7 +1,7 @@
-From 873d49a6bd3b48410d421e0da1ee20851c465fc3 Mon Sep 17 00:00:00 2001
-From: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
-Date: Mon, 2 Apr 2018 17:33:13 +0530
-Subject: [PATCH] cxgb4: speed up on-chip memory collection
+From ad86096b3a6dc8a11fbf4838c1a983b9497a5d8c Mon Sep 17 00:00:00 2001
+From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
+Date: Wed, 31 Dec 2025 14:44:47 -0500
+Subject: [PATCH 6/9] cxgb4: speed up on-chip memory collection
 
 Use GCC CPU intrinsic to do 256-bit reads instead of 32-bit reads
 when reading on-chip memory.
@@ -13,18 +13,18 @@ Signed-off-by: Rahul Lakkireddy <rahul.lakkireddy@chelsio.com>
  2 files changed, 59 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c b/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
-index 3297e0b75..49f163007 100644
+index 557c591a6ce3..d8c855136e4d 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cudbg_lib.c
-@@ -26,6 +26,7 @@
- #include "cudbg_entity.h"
+@@ -15,6 +15,7 @@
  #include "cudbg_lib.h"
  #include "cudbg_zlib.h"
+ #include "cxgb4_tc_mqprio.h"
 +#include "cxgb4_cudbg.h"
  
  static const u32 t6_tp_pio_array[][IREG_NUM_ELEM] = {
  	{0x7e40, 0x7e44, 0x020, 28}, /* t6_tp_pio_regs_20_to_3b */
-@@ -1299,7 +1300,7 @@ static int cudbg_memory_read(struct cudbg_init *pdbg_init, int win,
+@@ -1288,7 +1289,7 @@ static int cudbg_memory_read(struct cudbg_init *pdbg_init, int win,
  	struct adapter *adap = pdbg_init->adap;
  	u32 pos, offset, resid;
  	u32 *res_buf;
@@ -33,7 +33,7 @@ index 3297e0b75..49f163007 100644
  	int ret;
  
  	/* Argument sanity checks ...
-@@ -1307,10 +1308,10 @@ static int cudbg_memory_read(struct cudbg_init *pdbg_init, int win,
+@@ -1296,10 +1297,10 @@ static int cudbg_memory_read(struct cudbg_init *pdbg_init, int win,
  	if (addr & 0x3 || (uintptr_t)hbuf & 0x3)
  		return -EINVAL;
  
@@ -46,7 +46,7 @@ index 3297e0b75..49f163007 100644
  	len -= resid;
  
  	ret = t4_memory_rw_init(adap, win, mtype, &memoffset, &mem_base,
-@@ -1329,12 +1330,15 @@ static int cudbg_memory_read(struct cudbg_init *pdbg_init, int win,
+@@ -1318,12 +1319,15 @@ static int cudbg_memory_read(struct cudbg_init *pdbg_init, int win,
  	 */
  	t4_memory_update_win(adap, win, pos | win_pf);
  
@@ -66,7 +66,7 @@ index 3297e0b75..49f163007 100644
  
  		/* If we've reached the end of our current window aperture,
  		 * move the PCI-E Memory Window on to the next.
-@@ -1346,6 +1350,9 @@ static int cudbg_memory_read(struct cudbg_init *pdbg_init, int win,
+@@ -1335,6 +1339,9 @@ static int cudbg_memory_read(struct cudbg_init *pdbg_init, int win,
  		}
  	}
  
@@ -77,10 +77,10 @@ index 3297e0b75..49f163007 100644
  	/* Read residual in 32-bit multiples */
  	while (resid > sizeof(u32)) {
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h
-index e337f50eb..91e8cc823 100644
+index c04a49b6378d..c184a4e2a792 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_cudbg.h
-@@ -18,6 +18,8 @@
+@@ -6,6 +6,8 @@
  #ifndef __CXGB4_CUDBG_H__
  #define __CXGB4_CUDBG_H__
  
@@ -89,7 +89,7 @@ index e337f50eb..91e8cc823 100644
  #include "cudbg_if.h"
  #include "cudbg_lib_common.h"
  #include "cudbg_entity.h"
-@@ -42,6 +44,49 @@ enum CXGB4_ETHTOOL_DUMP_FLAGS {
+@@ -30,6 +32,49 @@ enum CXGB4_ETHTOOL_DUMP_FLAGS {
  	CXGB4_ETH_DUMP_FLASH = (1 << 2), /* Dump flash memory */
  };
  
@@ -140,5 +140,5 @@ index e337f50eb..91e8cc823 100644
  
  u32 cxgb4_get_dump_length(struct adapter *adap, u32 flag);
 -- 
-2.28.0
+2.39.1
 

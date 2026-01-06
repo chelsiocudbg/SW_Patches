@@ -1,0 +1,79 @@
+From 0f9a02fb7973979f06e05eac350a02cdec995a15 Mon Sep 17 00:00:00 2001
+From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
+Date: Mon, 5 Jan 2026 15:26:35 -0500
+Subject: [PATCH 9/9] RDMA/cxgb4: fix illegal ep access during debug access
+
+---
+ drivers/infiniband/hw/cxgb4/cm.c       | 7 +++++++
+ drivers/infiniband/hw/cxgb4/restrack.c | 4 ++++
+ 2 files changed, 11 insertions(+)
+
+diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
+index 8d753e6e0c71..951f540a5e5e 100644
+--- a/drivers/infiniband/hw/cxgb4/cm.c
++++ b/drivers/infiniband/hw/cxgb4/cm.c
+@@ -150,6 +150,7 @@ static DEFINE_SPINLOCK(timeout_lock);
+ static void deref_cm_id(struct c4iw_ep_common *epc)
+ {
+ 	epc->cm_id->rem_ref(epc->cm_id);
++	epc->cm_id->provider_data = NULL;
+ 	epc->cm_id = NULL;
+ 	set_bit(CM_ID_DEREFED, &epc->history);
+ }
+@@ -3101,6 +3102,8 @@ int c4iw_reject_cr(struct iw_cm_id *cm_id, const void *pdata, u8 pdata_len)
+ 	mutex_lock(&ep->com.mutex);
+ 	if (ep->com.state != MPA_REQ_RCVD) {
+ 		mutex_unlock(&ep->com.mutex);
++		if (cm_id->provider_data)
++			cm_id->provider_data = NULL;
+ 		c4iw_put_ep(&ep->com);
+ 		return -ECONNRESET;
+ 	}
+@@ -3113,6 +3116,8 @@ int c4iw_reject_cr(struct iw_cm_id *cm_id, const void *pdata, u8 pdata_len)
+ 
+ 	stop_ep_timer(ep);
+ 	c4iw_ep_disconnect(ep, abort != 0, GFP_KERNEL);
++	if (cm_id->provider_data)
++		cm_id->provider_data = NULL;
+ 	c4iw_put_ep(&ep->com);
+ 	return 0;
+ }
+@@ -3228,6 +3233,8 @@ int c4iw_accept_cr(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
+ 	mutex_unlock(&ep->com.mutex);
+ 	if (abort)
+ 		c4iw_ep_disconnect(ep, 1, GFP_KERNEL);
++	if (cm_id->provider_data)
++		cm_id->provider_data = NULL;
+ 	c4iw_put_ep(&ep->com);
+ 	return err;
+ }
+diff --git a/drivers/infiniband/hw/cxgb4/restrack.c b/drivers/infiniband/hw/cxgb4/restrack.c
+index fd22c85d35f4..f7e461ce62cd 100644
+--- a/drivers/infiniband/hw/cxgb4/restrack.c
++++ b/drivers/infiniband/hw/cxgb4/restrack.c
+@@ -209,6 +209,8 @@ int c4iw_fill_res_cm_id_entry(struct sk_buff *msg,
+ 	epcp = (struct c4iw_ep_common *)iw_cm_id->provider_data;
+ 	if (!epcp)
+ 		return 0;
++	if (!kref_get_unless_zero(&epcp->kref))
++		return 0;
+ 	uep = kzalloc(sizeof(*uep), GFP_KERNEL);
+ 	if (!uep)
+ 		return 0;
+@@ -222,11 +224,13 @@ int c4iw_fill_res_cm_id_entry(struct sk_buff *msg,
+ 	if (epcp->state == LISTEN) {
+ 		uep->lep = *(struct c4iw_listen_ep *)epcp;
+ 		mutex_unlock(&epcp->mutex);
++		c4iw_put_ep(epcp);
+ 		listen_ep = &uep->lep;
+ 		epcp = &listen_ep->com;
+ 	} else {
+ 		uep->ep = *(struct c4iw_ep *)epcp;
+ 		mutex_unlock(&epcp->mutex);
++		c4iw_put_ep(epcp);
+ 		ep = &uep->ep;
+ 		epcp = &ep->com;
+ 	}
+-- 
+2.39.1
+
