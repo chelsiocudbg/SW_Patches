@@ -1,0 +1,15 @@
+This file contains instructions for installing the libcstor library:
+
+Steps for compiling libcstor library
+------------------------------------
+
+# ./autogen.sh
+# ./configure --libdir=/usr/lib64
+# make && make install
+
+Note: to enable debug logs libcstor can be compiled in debug
+mode using the '--enable-debug' option of configure script as shown:
+
+# ./autogen.sh
+# ./configure --libdir=/usr/lib64 --enable-debug
+# make && make install

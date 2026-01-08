@@ -13,7 +13,7 @@
 2. Patch the kernel source. Apply all the patches in the order of patch
 numbering.
 ```
-# cd <path to kernel source to 3.10.0-693.17.1 kernel>
+# cd <path to kernel source to respective kernel>
 # for i in /home/SW_Patches/patches/for_eval/upstream/*.patch; do patch -p1 < $i; done
 # for i in /home/SW_Patches/patches/for_eval/cudbg/*.patch; do patch -p1 < $i; done
 ```
@@ -23,7 +23,7 @@ configuration file.
 
 4. Build and install the kernel.
 
-5. Install the Firmware and the configuration files.
+5. Install the Firmware and the configuration files (optional).
 ```
 # cp /home/SW_Patches/firmware/* /lib/firmware/cxgb4/
 ```
@@ -57,6 +57,12 @@ to provide hassle free debug log collection. To collect all the logs,
 where ethX is the Chelsio Interface.
 
 > NOTE: To know more options of cudbg, refer cudbg help by typing `# cudbg_app -h`
+
+### 1.4. LIBCSTOR
+User mode NVMe/TCP and iSCSI offload library.
+```
+# To compile and install libcstor refer /home/SW_Patches/libcstor/README.
+```
 
 # 2. Customer Support
 Please contact Chelsio support at support@chelsio.com for any issues regarding
