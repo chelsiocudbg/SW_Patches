@@ -1,0 +1,60 @@
+From 77be3e6868f36c51daa27db109f439b97abfd5f4 Mon Sep 17 00:00:00 2001
+From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
+Date: Wed, 25 Feb 2026 14:51:49 +0530
+Subject: [PATCH 12/13] RDMA/cxgb4: Notify RDMA stack in case of PCI detach
+
+---
+ drivers/infiniband/hw/cxgb4/device.c | 20 +++++++++++---------
+ 1 file changed, 11 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/device.c b/drivers/infiniband/hw/cxgb4/device.c
+index 9dae4a36173b..905bf96126c0 100644
+--- a/drivers/infiniband/hw/cxgb4/device.c
++++ b/drivers/infiniband/hw/cxgb4/device.c
+@@ -897,10 +897,13 @@ static void c4iw_rdev_close(struct c4iw_rdev *rdev)
+ 
+ void c4iw_dealloc(struct uld_ctx *ctx)
+ {
++	if (!xa_empty(&ctx->dev->cqs))
++		pr_err("iw_cxgb4: CQs pending!!\n");
++	if (!xa_empty(&ctx->dev->qps))
++		pr_err("iw_cxgb4: QPs pending!!\n");
++	if (!xa_empty(&ctx->dev->mrs))
++		pr_err("iw_cxgb4: MRs pending!!\n");
+ 	c4iw_rdev_close(&ctx->dev->rdev);
+-	WARN_ON(!xa_empty(&ctx->dev->cqs));
+-	WARN_ON(!xa_empty(&ctx->dev->qps));
+-	WARN_ON(!xa_empty(&ctx->dev->mrs));
+ 	wait_event(ctx->dev->wait, xa_empty(&ctx->dev->hwtids));
+ 	WARN_ON(!xa_empty(&ctx->dev->stids));
+ 	WARN_ON(!xa_empty(&ctx->dev->atids));
+@@ -1210,21 +1213,20 @@ static int c4iw_uld_state_change(void *handle, enum cxgb4_state new_state)
+ 	case CXGB4_STATE_FATAL_ERROR:
+ 	case CXGB4_STATE_START_RECOVERY:
+ 		pr_info("%s: Fatal Error\n", pci_name(ctx->lldi.pdev));
++		if (ctx->dev)
++			ctx->dev->rdev.flags |= T4_FATAL_ERROR;
++		fallthrough;
++	case CXGB4_STATE_DETACH:
++		pr_info("%s: Detach\n", pci_name(ctx->lldi.pdev));
+ 		if (ctx->dev) {
+ 			struct ib_event event = {};
+ 
+-			ctx->dev->rdev.flags |= T4_FATAL_ERROR;
+ 			event.event  = IB_EVENT_DEVICE_FATAL;
+ 			event.device = &ctx->dev->ibdev;
+ 			ib_dispatch_event(&event);
+ 			c4iw_remove(ctx);
+ 		}
+ 		break;
+-	case CXGB4_STATE_DETACH:
+-		pr_info("%s: Detach\n", pci_name(ctx->lldi.pdev));
+-		if (ctx->dev)
+-			c4iw_remove(ctx);
+-		break;
+ 	}
+ 	return 0;
+ }
+-- 
+2.39.1
+
