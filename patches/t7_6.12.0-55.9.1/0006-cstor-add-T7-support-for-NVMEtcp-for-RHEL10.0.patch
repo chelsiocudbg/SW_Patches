@@ -1,7 +1,7 @@
-From 6e4f4656ab36794e7b6b175b448227ee70611794 Mon Sep 17 00:00:00 2001
+From c7bddca80bae35d969bc56d56ff567218bc64ead Mon Sep 17 00:00:00 2001
 From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
-Date: Thu, 8 Jan 2026 18:50:08 +0530
-Subject: [PATCH] cstor: add T7 support for NVMEtcp for RHEL10.0
+Date: Mon, 23 Mar 2026 17:35:38 -0400
+Subject: [PATCH 6/7] cstor: add T7 support for NVMEtcp for RHEL10.0
 
 cxgb4: remove cxgb4_lld_info in cxgb4_rdma_resource.h
 
@@ -19,7 +19,6 @@ cxgb4: add macros required for cstor driver
 
 cstor: add user mode NVMe/TCP and iSCSI offload driver
 ---
- .config                                       |    1 +
  drivers/infiniband/hw/cxgb4/Makefile          |    3 +-
  drivers/infiniband/hw/cxgb4/cm.c              |   14 -
  drivers/infiniband/hw/cxgb4/cq.c              |   12 +-
@@ -58,7 +57,7 @@ cstor: add user mode NVMe/TCP and iSCSI offload driver
  .../net/ethernet/chelsio/cxgb4/cxgb4_uld.c    |   44 +-
  .../net/ethernet/chelsio/cxgb4/cxgb4_uld.h    |    4 +
  drivers/net/ethernet/chelsio/cxgb4/t4_msg.h   |   59 +
- 39 files changed, 13103 insertions(+), 648 deletions(-)
+ 38 files changed, 13102 insertions(+), 648 deletions(-)
  delete mode 100644 drivers/infiniband/hw/cxgb4/id_table.c
  create mode 100644 drivers/net/ethernet/chelsio/cstor/Makefile
  create mode 100644 drivers/net/ethernet/chelsio/cstor/cstor.h
@@ -80,18 +79,6 @@ cstor: add user mode NVMe/TCP and iSCSI offload driver
  create mode 100644 drivers/net/ethernet/chelsio/cstor/umem.c
  create mode 100644 drivers/net/ethernet/chelsio/cstor/umem.h
 
-diff --git a/.config b/.config
-index 2071e58ea6d0..ea6e7c3a6d05 100644
---- a/.config
-+++ b/.config
-@@ -813,6 +813,7 @@ CONFIG_CHELSIO_IPSEC_INLINE=m
- # CONFIG_CHELSIO_T4_DCB is not set
- CONFIG_CHELSIO_T4=m
- CONFIG_CHELSIO_T4VF=m
-+CONFIG_CHELSIO_CSTOR=m
- CONFIG_CHELSIO_TLS_DEVICE=m
- CONFIG_CHR_DEV_SCH=m
- CONFIG_CHR_DEV_SG=m
 diff --git a/drivers/infiniband/hw/cxgb4/Makefile b/drivers/infiniband/hw/cxgb4/Makefile
 index 291d259d2319..c0ee8a3dc348 100644
 --- a/drivers/infiniband/hw/cxgb4/Makefile

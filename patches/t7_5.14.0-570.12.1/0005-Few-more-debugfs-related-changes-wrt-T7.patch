@@ -1,7 +1,7 @@
-From ac69ded605370b02dc6d52b33a88e71d953ca68e Mon Sep 17 00:00:00 2001
+From a4614dedb6f5c93d5039e10d2103548f7e616237 Mon Sep 17 00:00:00 2001
 From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
 Date: Tue, 6 Jan 2026 18:32:24 -0500
-Subject: [PATCH 5/5] Few more debugfs related changes wrt T7
+Subject: [PATCH 5/7] Few more debugfs related changes wrt T7
 
 ---
  .../net/ethernet/chelsio/cxgb4/cudbg_entity.h |   13 +-

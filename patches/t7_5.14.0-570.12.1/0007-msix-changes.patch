@@ -1,7 +1,7 @@
-From 7c40eb9313dc5f2fd0500e1f6c1342c15140f52a Mon Sep 17 00:00:00 2001
+From 6762d375c1801563a14cd51fbbfa9c99185fb4ee Mon Sep 17 00:00:00 2001
 From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
 Date: Wed, 18 Feb 2026 10:23:01 -0500
-Subject: [PATCH] msix changes
+Subject: [PATCH 7/7] msix changes
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit

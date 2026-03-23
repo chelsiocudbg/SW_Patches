@@ -1,7 +1,7 @@
-From b00b1e5f91f06d9cb4a84925267cd619051c6b05 Mon Sep 17 00:00:00 2001
+From 720cd118cba9fb10921ffe251cd6073265ea6a5c Mon Sep 17 00:00:00 2001
 From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
 Date: Wed, 31 Dec 2025 13:14:07 -0500
-Subject: [PATCH 3/5] add cudbg support for T7
+Subject: [PATCH 3/7] add cudbg support for T7
 
 ---
  .../net/ethernet/chelsio/cxgb4/cudbg_entity.h |   114 +-

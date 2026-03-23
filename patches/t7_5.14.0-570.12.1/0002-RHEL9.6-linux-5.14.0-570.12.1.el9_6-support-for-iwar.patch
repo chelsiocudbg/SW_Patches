@@ -1,10 +1,9 @@
-From 1e3d4b1bd0a10900068a6f7f8104fb3ab27d9bf7 Mon Sep 17 00:00:00 2001
+From afeecb84852a8a227ab0788c023445c969049188 Mon Sep 17 00:00:00 2001
 From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
-Date: Tue, 23 Dec 2025 21:07:04 -0500
-Subject: [PATCH 2/5] RHEL9.6(linux-5.14.0-570.12.1.el9_6) support for iwarp
+Date: Mon, 23 Mar 2026 15:17:06 -0400
+Subject: [PATCH 2/7] RHEL9.6(linux-5.14.0-570.12.1.el9_6) support for iwarp
 
 ---
- .config                                       |  12 +-
  drivers/crypto/Makefile                       |   2 +-
  drivers/infiniband/hw/cxgb4/cm.c              | 281 ++++---
  drivers/infiniband/hw/cxgb4/device.c          |   4 +-
@@ -34,68 +33,8 @@ Subject: [PATCH 2/5] RHEL9.6(linux-5.14.0-570.12.1.el9_6) support for iwarp
  drivers/net/ethernet/chelsio/cxgb4/t4_regs.h  |  11 +
  drivers/scsi/Makefile                         |   4 +-
  drivers/target/iscsi/Makefile                 |   2 +-
- 30 files changed, 1645 insertions(+), 1065 deletions(-)
+ 29 files changed, 1642 insertions(+), 1056 deletions(-)
 
-diff --git a/.config b/.config
-index 5f7cc00139ad..c0d335bb777f 100644
---- a/.config
-+++ b/.config
-@@ -2,9 +2,9 @@
- # Automatically generated file; DO NOT EDIT.
- # Linux/x86 5.14.0 Kernel Configuration
- #
--CONFIG_CC_VERSION_TEXT="gcc (GCC) 14.3.0"
-+CONFIG_CC_VERSION_TEXT="gcc (GCC) 11.3.1 20221121 (Red Hat 11.3.1-4)"
- CONFIG_CC_IS_GCC=y
--CONFIG_GCC_VERSION=140300
-+CONFIG_GCC_VERSION=110301
- CONFIG_CLANG_VERSION=0
- CONFIG_AS_IS_GNU=y
- CONFIG_AS_VERSION=23502
-@@ -192,6 +192,7 @@ CONFIG_CC_HAS_INT128=y
- CONFIG_CC_IMPLICIT_FALLTHROUGH="-Wimplicit-fallthrough=5"
- CONFIG_GCC11_NO_ARRAY_BOUNDS=y
- CONFIG_GCC12_NO_ARRAY_BOUNDS=y
-+CONFIG_CC_NO_ARRAY_BOUNDS=y
- CONFIG_ARCH_SUPPORTS_INT128=y
- CONFIG_NUMA_BALANCING=y
- CONFIG_NUMA_BALANCING_DEFAULT_ENABLED=y
-@@ -918,7 +919,6 @@ CONFIG_ARCH_HAS_GCOV_PROFILE_ALL=y
- # end of GCOV-based kernel profiling
- 
- CONFIG_HAVE_GCC_PLUGINS=y
--# CONFIG_GCC_PLUGINS is not set
- CONFIG_FUNCTION_ALIGNMENT_4B=y
- CONFIG_FUNCTION_ALIGNMENT_16B=y
- CONFIG_FUNCTION_ALIGNMENT=16
-@@ -8117,11 +8117,7 @@ CONFIG_LSM="landlock,lockdown,yama,integrity,selinux,bpf"
- #
- # Memory initialization
- #
--CONFIG_CC_HAS_AUTO_VAR_INIT_PATTERN=y
--CONFIG_CC_HAS_AUTO_VAR_INIT_ZERO=y
- CONFIG_INIT_STACK_NONE=y
--# CONFIG_INIT_STACK_ALL_PATTERN is not set
--# CONFIG_INIT_STACK_ALL_ZERO is not set
- # CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set
- # CONFIG_INIT_ON_FREE_DEFAULT_ON is not set
- # end of Memory initialization
-@@ -8665,7 +8661,6 @@ CONFIG_DEBUG_MEMORY_INIT=y
- CONFIG_HAVE_ARCH_KASAN=y
- CONFIG_HAVE_ARCH_KASAN_VMALLOC=y
- CONFIG_CC_HAS_KASAN_GENERIC=y
--CONFIG_CC_HAS_KASAN_SW_TAGS=y
- CONFIG_CC_HAS_WORKING_NOSANITIZE_ADDRESS=y
- # CONFIG_KASAN is not set
- CONFIG_HAVE_ARCH_KFENCE=y
-@@ -8932,7 +8927,6 @@ CONFIG_FUNCTION_ERROR_INJECTION=y
- # CONFIG_FAULT_INJECTION is not set
- CONFIG_ARCH_HAS_KCOV=y
- CONFIG_CC_HAS_SANCOV_TRACE_PC=y
--# CONFIG_KCOV is not set
- CONFIG_RUNTIME_TESTING_MENU=y
- # CONFIG_LKDTM is not set
- CONFIG_CPUMASK_KUNIT_TEST=m
 diff --git a/drivers/crypto/Makefile b/drivers/crypto/Makefile
 index d47e052cfed6..9595f35a5112 100644
 --- a/drivers/crypto/Makefile

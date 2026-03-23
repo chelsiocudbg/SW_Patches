@@ -1,7 +1,7 @@
-From 83462f050d5dd2ee18ffb09f1c8b80484f241fec Mon Sep 17 00:00:00 2001
+From f9eb2474e855d67e3ef35c52ccfedfeeac4b0929 Mon Sep 17 00:00:00 2001
 From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
 Date: Wed, 31 Dec 2025 13:21:43 -0500
-Subject: [PATCH 4/5] misc fixes:
+Subject: [PATCH 4/7] misc fixes:
 
 - fix port stats display
 - fix resource leak in unload path

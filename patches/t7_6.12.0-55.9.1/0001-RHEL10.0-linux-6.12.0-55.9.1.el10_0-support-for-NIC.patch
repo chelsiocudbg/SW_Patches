@@ -1,7 +1,7 @@
-From e21487eaa9d132d107cd8c9cbf20c1c2c5ca42d5 Mon Sep 17 00:00:00 2001
+From 17af4b1a3415ebeaf2f664ff8c2482d59a1b7d5f Mon Sep 17 00:00:00 2001
 From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
 Date: Tue, 23 Dec 2025 20:57:40 -0500
-Subject: [PATCH 1/5] RHEL10.0(linux-6.12.0-55.9.1.el10_0) support for NIC
+Subject: [PATCH 1/7] RHEL10.0(linux-6.12.0-55.9.1.el10_0) support for NIC
 
 ---
  drivers/net/ethernet/chelsio/cxgb4/Makefile   |    3 +-
