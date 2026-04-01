@@ -1,0 +1,906 @@
+From f1979e4ff3059527c337785b7ccadee44041ae40 Mon Sep 17 00:00:00 2001
+From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
+Date: Tue, 31 Mar 2026 21:26:16 -0400
+Subject: [PATCH 2/4] driver updates for NIC,iWARP and CStor
+
+---
+ drivers/infiniband/hw/cxgb4/ev.c              |  32 +++-
+ drivers/infiniband/hw/cxgb4/iw_cxgb4.h        |   1 +
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h    |   3 +
+ .../ethernet/chelsio/cxgb4/cxgb4_debugfs.c    |  10 +-
+ .../ethernet/chelsio/cxgb4/cxgb4_ethtool.c    |  99 ++++++++++-
+ .../net/ethernet/chelsio/cxgb4/cxgb4_filter.c |  74 ++++----
+ .../net/ethernet/chelsio/cxgb4/cxgb4_main.c   |  28 ++-
+ .../net/ethernet/chelsio/cxgb4/cxgb4_pci.c    |   2 +-
+ .../ethernet/chelsio/cxgb4/cxgb4_thermal.c    |   6 +-
+ .../net/ethernet/chelsio/cxgb4/cxgb4_uld.h    |   1 +
+ drivers/net/ethernet/chelsio/cxgb4/sge.c      |   4 +-
+ drivers/net/ethernet/chelsio/cxgb4/t4_hw.c    | 168 ++++++++++++++++++
+ .../ethernet/chelsio/cxgb4vf/cxgb4vf_main.c   |  29 ++-
+ 13 files changed, 397 insertions(+), 60 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/ev.c b/drivers/infiniband/hw/cxgb4/ev.c
+index 34211a533d5c..7f140843e7fb 100644
+--- a/drivers/infiniband/hw/cxgb4/ev.c
++++ b/drivers/infiniband/hw/cxgb4/ev.c
+@@ -35,10 +35,13 @@
+ 
+ #include "iw_cxgb4.h"
+ 
+-static void print_tpte(struct c4iw_dev *dev, u32 stag)
++void print_tpte(struct c4iw_dev *dev, u32 stag)
+ {
+-	int ret;
++	int ret, i;
+ 	struct fw_ri_tpte tpte;
++	u64 len_b, len;
++	__be32 *pble;
++
+ 
+ 	ret = cxgb4_read_tpte(dev->rdev.lldi.ports[0], stag,
+ 			      (__be32 *)&tpte);
+@@ -47,7 +50,8 @@ static void print_tpte(struct c4iw_dev *dev, u32 stag)
+ 			"%s cxgb4_read_tpte err %d\n", __func__, ret);
+ 		return;
+ 	}
+-	pr_debug("stag idx 0x%x valid %d key 0x%x state %d pdid %d perm 0x%x ps %d len 0x%llx va 0x%llx\n",
++	pr_debug("stag idx 0x%x valid %d key 0x%x state %d pdid %d"
++		 "perm 0x%x ps %d pbl_addr 0x%x len 0x%llx va 0x%llx\n",
+ 		 stag & 0xffffff00,
+ 		 FW_RI_TPTE_VALID_G(ntohl(tpte.valid_to_pdid)),
+ 		 FW_RI_TPTE_STAGKEY_G(ntohl(tpte.valid_to_pdid)),
+@@ -55,8 +59,27 @@ static void print_tpte(struct c4iw_dev *dev, u32 stag)
+ 		 FW_RI_TPTE_PDID_G(ntohl(tpte.valid_to_pdid)),
+ 		 FW_RI_TPTE_PERM_G(ntohl(tpte.locread_to_qpid)),
+ 		 FW_RI_TPTE_PS_G(ntohl(tpte.locread_to_qpid)),
++		 FW_RI_TPTE_PBLADDR_G(ntohl(tpte.nosnoop_pbladdr)),
+ 		 ((u64)ntohl(tpte.len_hi) << 32) | ntohl(tpte.len_lo),
+ 		 ((u64)ntohl(tpte.va_hi) << 32) | ntohl(tpte.va_lo_fbo));
++
++	len = ((u64)ntohl(tpte.len_hi) << 32) | ntohl(tpte.len_lo);
++	len_b = (len / PAGE_SIZE + 1) * 8;
++	pble = kzalloc(len_b, GFP_ATOMIC);
++	ret = cxgb4_read_pbl_entries(dev->rdev.lldi.ports[0],
++			FW_RI_TPTE_PBLADDR_G(ntohl(tpte.nosnoop_pbladdr)),
++			len_b, (__be32 *)pble);
++	pr_err("PBL Dump:\n");
++	for (i = 0; i < len_b / 4;) {
++		pr_err("0x%08x %08x\n", be32_to_cpu(pble[i]), be32_to_cpu(pble[i+1]));
++		i+=2;
++	}
++
++	if (ret) {
++		pr_err("%s cxgb4_read_pbl_entries err %d\n", __func__, ret);
++		return;
++	}
++	kfree(pble);
+ }
+ 
+ static void dump_err_cqe(struct c4iw_dev *dev, struct t4_cqe *err_cqe)
+@@ -70,7 +93,8 @@ static void dump_err_cqe(struct c4iw_dev *dev, struct t4_cqe *err_cqe)
+ 		CQE_STATUS(err_cqe), CQE_TYPE(err_cqe), ntohl(err_cqe->len),
+ 		CQE_WRID_HI(err_cqe), CQE_WRID_LOW(err_cqe));
+ 
+-	pr_debug("%016llx %016llx %016llx %016llx - %016llx %016llx %016llx %016llx\n",
++	pr_debug("%016llx %016llx %016llx %016llx\n"
++		 "%016llx %016llx %016llx %016llx\n",
+ 		 be64_to_cpu(p[0]), be64_to_cpu(p[1]), be64_to_cpu(p[2]),
+ 		 be64_to_cpu(p[3]), be64_to_cpu(p[4]), be64_to_cpu(p[5]),
+ 		 be64_to_cpu(p[6]), be64_to_cpu(p[7]));
+diff --git a/drivers/infiniband/hw/cxgb4/iw_cxgb4.h b/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
+index 03c74bcaf8f6..29fb6ab2e8ae 100644
+--- a/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
++++ b/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
+@@ -985,6 +985,7 @@ int c4iw_ep_disconnect(struct c4iw_ep *ep, int abrupt, gfp_t gfp);
+ int c4iw_flush_rq(struct t4_wq *wq, struct t4_cq *cq, int count);
+ int c4iw_flush_sq(struct c4iw_qp *qhp);
+ int c4iw_ev_handler(struct c4iw_dev *rnicp, u32 qid);
++void print_tpte(struct c4iw_dev *dev, u32 stag);
+ void c4iw_ev_dispatch(struct c4iw_dev *dev, struct t4_cqe *err_cqe);
+ 
+ extern struct cxgb4_client t4c_client;
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+index b20380c5ea09..e570807487ce 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+@@ -2035,6 +2035,9 @@ void t4_setup_memwin(struct adapter *adap, u32 memwin_base, u32 window);
+ 
+ int t4_memory_rw_init(struct adapter *adap, int win, int mtype, u64 *mem_off,
+ 		      u64 *mem_base, u64 *mem_aperture);
++int t4_memory_rw_addr(struct adapter *adap, int win,
++		u64 addr, u64 len,
++		void *hbuf, int dir);
+ void t4_memory_rw_residual(struct adapter *adap, u64 off, u64 addr, u8 *buf,
+ 			   int dir);
+ #define T4_MEMORY_WRITE	0
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_debugfs.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_debugfs.c
+index 6fd675f7090a..068c100e7abb 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_debugfs.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_debugfs.c
+@@ -2244,8 +2244,8 @@ static int sensors_show(struct seq_file *seq, void *v)
+ {
+ 	struct t4_linux_debugfs_data *d = seq->private;
+ 	struct adapter *adap = d->adap;
+-	u32 param[7], val[7];
+-	int ret;
++	u32 param[7];
++	int ret, val[7];
+ 
+ 	/* Note that if the sensors haven't been initialized and turned on
+ 	 * we'll get values of 0, so treat those as "<unknown>" ...
+@@ -2259,12 +2259,12 @@ static int sensors_show(struct seq_file *seq, void *v)
+ 	ret = t4_query_params(adap, adap->mbox, adap->pf, 0, 2,
+ 			      param, val);
+ 
+-	if (ret < 0 || val[0] == 0)
++	if (ret < 0)
+ 		seq_puts(seq, "Temperature: <unknown>\n");
+ 	else
+ 		seq_printf(seq, "Temperature: %dC\n", val[0]);
+ 
+-	if (ret < 0 || val[1] == 0)
++	if (ret < 0)
+ 		seq_puts(seq, "Core VDD:    <unknown>\n");
+ 	else
+ 		seq_printf(seq, "Core VDD:    %dmV\n", val[1]);
+@@ -3052,7 +3052,7 @@ static int cxgb4_sge_qinfo_eth_nic(struct seq_file *seq, int *row)
+ 
+ 	cxgb4_sge_qinfo_eth(seq, r, s->ethqsets, rx, tx, "ETHERNET");
+ #ifdef CONFIG_CXGB4_DCB
+-	n = min(SGE_QINFO_NUM_PER_ROW, nentries - SGE_QINFO_NUM_PER_ROW * r);
++	n = min(SGE_QINFO_NUM_PER_ROW, s->ethqsets - SGE_QINFO_NUM_PER_ROW * r);
+ 	T("DCB Prio:", dcb_prio);
+ 	S3("u", "DCB PGID:",
+ 	   (ethqset2pinfo(adap, base_qset + i)->dcb.pgid >>
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c
+index cbf9922591fc..bd5000b91980 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c
+@@ -15,6 +15,7 @@
+ 
+ #define EEPROM_MAGIC 0x38E2F10C
+ #define RSS_HASH_KEY_SIZE 40
++#define CMIS_PAGE_SELECT_REG 127
+ 
+ static u32 get_msglevel(struct net_device *dev)
+ {
+@@ -457,8 +458,12 @@ static int from_fw_port_mod_type(enum fw_port_type port_type,
+ 		else
+ 			return PORT_OTHER;
+ 	} else if (port_type == FW_PORT_TYPE_KR4_100G ||
+-		   port_type == FW_PORT_TYPE_KR_SFP28 ||
+-		   port_type == FW_PORT_TYPE_KR_XLAUI) {
++			port_type == FW_PORT_TYPE_KR_SFP28 ||
++			port_type == FW_PORT_TYPE_KR_XLAUI ||
++			port_type == FW_PORT_TYPE_KR_50G ||
++			port_type == FW_PORT_TYPE_KR2_100G ||
++			port_type == FW_PORT_TYPE_KR4_200G ||
++			port_type == FW_PORT_TYPE_KR8_400G) {
+ 		return PORT_NONE;
+ 	}
+ 
+@@ -568,6 +573,12 @@ static void fw_caps_to_lmm(enum fw_port_type port_type,
+ 		break;
+ 
+ 	case FW_PORT_TYPE_BP40_BA:
++                SET_LMM(Backplane);
++                FW_CAPS_TO_LMM(SPEED_1G,  1000baseT_Full);
++                FW_CAPS_TO_LMM(SPEED_10G, 10000baseKR_Full);
++                FW_CAPS_TO_LMM(SPEED_40G, 40000baseKR4_Full);
++                break;
++
+ 	case FW_PORT_TYPE_QSFP:
+ 		SET_LMM(FIBRE);
+ 		FW_CAPS_TO_LMM(SPEED_1G, 1000baseT_Full);
+@@ -617,6 +628,15 @@ static void fw_caps_to_lmm(enum fw_port_type port_type,
+ 		break;
+ 
+ 	case FW_PORT_TYPE_KR4_100G:
++                SET_LMM(Backplane);
++                FW_CAPS_TO_LMM(SPEED_1G,  1000baseT_Full);
++                FW_CAPS_TO_LMM(SPEED_10G, 10000baseKR_Full);
++                FW_CAPS_TO_LMM(SPEED_25G, 25000baseKR_Full);
++                FW_CAPS_TO_LMM(SPEED_40G, 40000baseKR4_Full);
++                FW_CAPS_TO_LMM(SPEED_50G, 50000baseKR2_Full);
++                FW_CAPS_TO_LMM(SPEED_100G, 100000baseKR4_Full);
++                break;
++
+ 	case FW_PORT_TYPE_CR4_QSFP:
+ 		SET_LMM(FIBRE);
+ 		FW_CAPS_TO_LMM(SPEED_1G,  1000baseT_Full);
+@@ -627,6 +647,50 @@ static void fw_caps_to_lmm(enum fw_port_type port_type,
+ 		FW_CAPS_TO_LMM(SPEED_100G, 100000baseCR4_Full);
+ 		break;
+ 
++	case FW_PORT_TYPE_KR_50G:
++		SET_LMM(Backplane);
++		FW_CAPS_TO_LMM(SPEED_1G,  1000baseT_Full);
++		FW_CAPS_TO_LMM(SPEED_10G, 10000baseKR_Full);
++		FW_CAPS_TO_LMM(SPEED_25G, 25000baseKR_Full);
++		FW_CAPS_TO_LMM(SPEED_50G, 50000baseKR_Full);
++		break;
++
++	case FW_PORT_TYPE_KR2_100G:
++		SET_LMM(Backplane);
++		FW_CAPS_TO_LMM(SPEED_1G,  1000baseT_Full);
++		FW_CAPS_TO_LMM(SPEED_10G, 10000baseKR_Full);
++		FW_CAPS_TO_LMM(SPEED_25G, 25000baseKR_Full);
++		FW_CAPS_TO_LMM(SPEED_50G, 50000baseKR_Full);
++		FW_CAPS_TO_LMM(SPEED_50G, 50000baseKR2_Full);
++		FW_CAPS_TO_LMM(SPEED_100G, 100000baseKR2_Full);
++		break;
++
++	case FW_PORT_TYPE_KR4_200G:
++		SET_LMM(FIBRE);
++		FW_CAPS_TO_LMM(SPEED_1G,  1000baseT_Full);
++		FW_CAPS_TO_LMM(SPEED_10G, 10000baseKR_Full);
++		FW_CAPS_TO_LMM(SPEED_25G, 25000baseKR_Full);
++		FW_CAPS_TO_LMM(SPEED_40G, 40000baseKR4_Full);
++		FW_CAPS_TO_LMM(SPEED_50G, 50000baseKR_Full);
++		FW_CAPS_TO_LMM(SPEED_50G, 50000baseKR2_Full);
++		FW_CAPS_TO_LMM(SPEED_100G, 100000baseKR2_Full);
++		FW_CAPS_TO_LMM(SPEED_100G, 100000baseKR4_Full);
++		FW_CAPS_TO_LMM(SPEED_200G, 200000baseKR4_Full);
++		break;
++
++	case FW_PORT_TYPE_KR8_400G:
++		SET_LMM(Backplane);
++		FW_CAPS_TO_LMM(SPEED_1G,  1000baseT_Full);
++		FW_CAPS_TO_LMM(SPEED_10G, 10000baseKR_Full);
++		FW_CAPS_TO_LMM(SPEED_25G, 25000baseKR_Full);
++		FW_CAPS_TO_LMM(SPEED_40G, 40000baseKR4_Full);
++		FW_CAPS_TO_LMM(SPEED_50G, 50000baseKR_Full);
++		FW_CAPS_TO_LMM(SPEED_50G, 50000baseKR2_Full);
++		FW_CAPS_TO_LMM(SPEED_100G, 100000baseKR2_Full);
++		FW_CAPS_TO_LMM(SPEED_100G, 100000baseKR4_Full);
++		FW_CAPS_TO_LMM(SPEED_200G, 200000baseKR4_Full);
++		FW_CAPS_TO_LMM(SPEED_400G, 400000baseKR8_Full);
++		break;
+ 	default:
+ 		break;
+ 	}
+@@ -2010,6 +2074,36 @@ static int cxgb4_get_module_eeprom(struct net_device *dev,
+ 			 offset, len, &data[eprom->len - len]);
+ }
+ 
++static int cxgb4_get_module_eeprom_by_page(struct net_device *dev,
++                                          const struct ethtool_module_eeprom *page_data,
++                                          struct netlink_ext_ack *extack)
++{
++       struct port_info *pi = netdev_priv(dev);
++       struct adapter *adapter = pi->adapter;
++       int ret;
++
++       if (page_data->offset >= 128) {
++	       u8 page = page_data->page;
++	       /* Before reading EEPROM data first select the page in PageSelect register */
++	       ret = t4_i2c_rd(adapter, adapter->mbox, pi->lport,
++			       page_data->i2c_address << 1,
++			       CMIS_PAGE_SELECT_REG,        /* CMIS Page Select register */
++			       1,                           /* Page Select register length */
++			       &page);
++	       if (ret)
++		       return ret;
++       }
++
++       ret = t4_i2c_rd(adapter, adapter->mbox, pi->lport,
++                       page_data->i2c_address << 1, page_data->offset,
++                       page_data->length, page_data->data);
++
++       if(ret)
++               return ret;
++
++       return page_data->length;
++}
++
+ static u32 cxgb4_get_priv_flags(struct net_device *netdev)
+ {
+ 	struct port_info *pi = netdev_priv(netdev);
+@@ -2121,6 +2215,7 @@ static const struct ethtool_ops cxgb_ethtool_ops = {
+ 	.get_dump_data     = get_dump_data,
+ 	.get_module_info   = cxgb4_get_module_info,
+ 	.get_module_eeprom = cxgb4_get_module_eeprom,
++	.get_module_eeprom_by_page  = cxgb4_get_module_eeprom_by_page,
+ 	.get_priv_flags    = cxgb4_get_priv_flags,
+ 	.set_priv_flags    = cxgb4_set_priv_flags,
+ };
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_filter.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_filter.c
+index 4e1ee1aeaec2..e411a1ff38a3 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_filter.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_filter.c
+@@ -1317,7 +1317,7 @@ static int cxgb4_filter_hash_delete(struct net_device *dev, u32 filter_id,
+ }
+ 
+ static int set_tcb_field(struct adapter *adap, struct filter_entry *f,
+-			 u32 ftid,  u16 word, u64 mask, u64 val, int no_reply)
++		u16 word, u64 mask, u64 val, int no_reply)
+ {
+ 	struct cpl_set_tcb_field *req;
+ 	struct sk_buff *skb;
+@@ -1328,7 +1328,7 @@ static int set_tcb_field(struct adapter *adap, struct filter_entry *f,
+ 		return -ENOMEM;
+ 
+ 	req = (struct cpl_set_tcb_field *)__skb_put_zero(skb, sizeof(*req));
+-	INIT_TP_WR_CPL(req, CPL_SET_TCB_FIELD, ftid);
++	INIT_TP_WR_CPL(req, CPL_SET_TCB_FIELD, f->tid);
+ 	req->reply_ctrl = htons(REPLY_CHAN_V(0) |
+ 				QUEUENO_V(adap->sge.fw_evtq.abs_id) |
+ 				NO_REPLY_V(no_reply));
+@@ -1340,7 +1340,7 @@ static int set_tcb_field(struct adapter *adap, struct filter_entry *f,
+ 		req->reply_ctrl = htons(REPLY_CHAN_V(0) |
+ 				QUEUENO_V(adap->sge.fw_evtq.abs_id) |
+ 				NO_REPLY_V(no_reply));
+-	req->word_cookie = htons(TCB_WORD_V(word) | TCB_COOKIE_V(ftid));
++	req->word_cookie = htons(TCB_WORD_V(word) | TCB_COOKIE_V(f->tid));
+ 	req->mask = cpu_to_be64(mask);
+ 	req->val = cpu_to_be64(val);
+ 	ctrlq_index = f->fs.val.iport * adap->params.num_up_cores;
+@@ -1353,46 +1353,45 @@ static int set_tcb_field(struct adapter *adap, struct filter_entry *f,
+ /* Set one of the t_flags bits in the TCB.
+  */
+ static void set_tcb_tflag(struct adapter *adap, struct filter_entry *f,
+-                         u32 ftid, u32 bit_pos, u32 val, int no_reply)
++		u32 bit_pos, u32 val, int no_reply)
+ {
+-       set_tcb_field(adap, f, ftid,  TCB_T_FLAGS_W, 1ULL << bit_pos,
++       set_tcb_field(adap, f, TCB_T_FLAGS_W, 1ULL << bit_pos,
+                      (unsigned long long)val << bit_pos, no_reply);
+ }
+ 
+ static void set_nat_params(struct adapter *adap, struct filter_entry *f,
+-			   unsigned int tid, bool dip, bool sip, bool dp,
+-			   bool sp)
++		bool dip, bool sip, bool dp, bool sp)
+ {
+ 	u8 *nat_lp = (u8 *)&f->fs.nat_lport;
+ 	u8 *nat_fp = (u8 *)&f->fs.nat_fport;
+ 
+ 	if (dip) {
+ 		if (f->fs.type) {
+-			set_tcb_field(adap, f, tid, TCB_SND_UNA_RAW_W,
++			set_tcb_field(adap, f, TCB_SND_UNA_RAW_W,
+ 				      WORD_MASK, f->fs.nat_lip[15] |
+ 				      f->fs.nat_lip[14] << 8 |
+ 				      f->fs.nat_lip[13] << 16 |
+ 				      (u64)f->fs.nat_lip[12] << 24, 1);
+ 
+-			set_tcb_field(adap, f, tid, TCB_SND_UNA_RAW_W + 1,
++			set_tcb_field(adap, f, TCB_SND_UNA_RAW_W + 1,
+ 				      WORD_MASK, f->fs.nat_lip[11] |
+ 				      f->fs.nat_lip[10] << 8 |
+ 				      f->fs.nat_lip[9] << 16 |
+ 				      (u64)f->fs.nat_lip[8] << 24, 1);
+ 
+-			set_tcb_field(adap, f, tid, TCB_SND_UNA_RAW_W + 2,
++			set_tcb_field(adap, f, TCB_SND_UNA_RAW_W + 2,
+ 				      WORD_MASK, f->fs.nat_lip[7] |
+ 				      f->fs.nat_lip[6] << 8 |
+ 				      f->fs.nat_lip[5] << 16 |
+ 				      (u64)f->fs.nat_lip[4] << 24, 1);
+ 
+-			set_tcb_field(adap, f, tid, TCB_SND_UNA_RAW_W + 3,
++			set_tcb_field(adap, f, TCB_SND_UNA_RAW_W + 3,
+ 				      WORD_MASK, f->fs.nat_lip[3] |
+ 				      f->fs.nat_lip[2] << 8 |
+ 				      f->fs.nat_lip[1] << 16 |
+ 				      (u64)f->fs.nat_lip[0] << 24, 1);
+ 		} else {
+-			set_tcb_field(adap, f, tid, TCB_RX_FRAG3_LEN_RAW_W,
++			set_tcb_field(adap, f, TCB_RX_FRAG3_LEN_RAW_W,
+ 				      WORD_MASK, f->fs.nat_lip[3] |
+ 				      f->fs.nat_lip[2] << 8 |
+ 				      f->fs.nat_lip[1] << 16 |
+@@ -1402,33 +1401,32 @@ static void set_nat_params(struct adapter *adap, struct filter_entry *f,
+ 
+ 	if (sip) {
+ 		if (f->fs.type) {
+-			set_tcb_field(adap, f, tid, TCB_RX_FRAG2_PTR_RAW_W,
++			set_tcb_field(adap, f, TCB_RX_FRAG2_PTR_RAW_W,
+ 				      WORD_MASK, f->fs.nat_fip[15] |
+ 				      f->fs.nat_fip[14] << 8 |
+ 				      f->fs.nat_fip[13] << 16 |
+ 				      (u64)f->fs.nat_fip[12] << 24, 1);
+ 
+-			set_tcb_field(adap, f, tid, TCB_RX_FRAG2_PTR_RAW_W + 1,
++			set_tcb_field(adap, f, TCB_RX_FRAG2_PTR_RAW_W + 1,
+ 				      WORD_MASK, f->fs.nat_fip[11] |
+ 				      f->fs.nat_fip[10] << 8 |
+ 				      f->fs.nat_fip[9] << 16 |
+ 				      (u64)f->fs.nat_fip[8] << 24, 1);
+ 
+-			set_tcb_field(adap, f, tid, TCB_RX_FRAG2_PTR_RAW_W + 2,
++			set_tcb_field(adap, f, TCB_RX_FRAG2_PTR_RAW_W + 2,
+ 				      WORD_MASK, f->fs.nat_fip[7] |
+ 				      f->fs.nat_fip[6] << 8 |
+ 				      f->fs.nat_fip[5] << 16 |
+ 				      (u64)f->fs.nat_fip[4] << 24, 1);
+ 
+-			set_tcb_field(adap, f, tid, TCB_RX_FRAG2_PTR_RAW_W + 3,
++			set_tcb_field(adap, f, TCB_RX_FRAG2_PTR_RAW_W + 3,
+ 				      WORD_MASK, f->fs.nat_fip[3] |
+ 				      f->fs.nat_fip[2] << 8 |
+ 				      f->fs.nat_fip[1] << 16 |
+ 				      (u64)f->fs.nat_fip[0] << 24, 1);
+ 
+ 		} else {
+-			set_tcb_field(adap, f, tid,
+-				      TCB_RX_FRAG3_START_IDX_OFFSET_RAW_W,
++			set_tcb_field(adap, f, TCB_RX_FRAG3_START_IDX_OFFSET_RAW_W,
+ 				      WORD_MASK, f->fs.nat_fip[3] |
+ 				      f->fs.nat_fip[2] << 8 |
+ 				      f->fs.nat_fip[1] << 16 |
+@@ -1436,7 +1434,7 @@ static void set_nat_params(struct adapter *adap, struct filter_entry *f,
+ 		}
+ 	}
+ 
+-	set_tcb_field(adap, f, tid, TCB_PDU_HDR_LEN_W, WORD_MASK,
++	set_tcb_field(adap, f, TCB_PDU_HDR_LEN_W, WORD_MASK,
+ 		      (dp ? (nat_lp[1] | nat_lp[0] << 8) : 0) |
+ 		      (sp ? (nat_fp[1] << 16 | (u64)nat_fp[0] << 24) : 0),
+ 		      1);
+@@ -1564,50 +1562,50 @@ void cxgb4_filter_hash_create_rpl(struct adapter *adap,
+         }
+ 
+         if (f->fs.hitcnts) {
+-                set_tcb_field(adap, f, tid, TCB_TIMESTAMP_W,
++                set_tcb_field(adap, f, TCB_TIMESTAMP_W,
+                               TCB_TIMESTAMP_V(TCB_TIMESTAMP_M),
+                               TCB_TIMESTAMP_V(0ULL), 1);
+-                set_tcb_field(adap, f, tid, TCB_T_RTT_TS_RECENT_AGE_W,
++                set_tcb_field(adap, f, TCB_T_RTT_TS_RECENT_AGE_W,
+                               TCB_T_RTT_TS_RECENT_AGE_V(TCB_T_RTT_TS_RECENT_AGE_M),
+                               TCB_T_RTT_TS_RECENT_AGE_V(0ULL), 1);
+         }
+ 
+         if (f->fs.newdmac)
+-                set_tcb_tflag(adap, f, tid, TF_CCTRL_ECE_S, 1, 1);
++                set_tcb_tflag(adap, f, TF_CCTRL_ECE_S, 1, 1);
+ 
+         if (f->fs.newvlan == VLAN_INSERT || f->fs.newvlan == VLAN_REWRITE)
+-                set_tcb_tflag(adap, f, tid, TF_CCTRL_RFR_S, 1, 1);
++                set_tcb_tflag(adap, f, TF_CCTRL_RFR_S, 1, 1);
+ 
+         if (f->fs.newsmac) {
+-                set_tcb_field(adap, f, tid, TCB_SMAC_SEL_W,
++                set_tcb_field(adap, f, TCB_SMAC_SEL_W,
+                               TCB_SMAC_SEL_V(TCB_SMAC_SEL_M),
+                               TCB_SMAC_SEL_V(f->smtidx), 1);
+-                set_tcb_tflag(adap, f, tid, TF_CCTRL_CWR_S, 1, 1);
++                set_tcb_tflag(adap, f, TF_CCTRL_CWR_S, 1, 1);
+         }
+ 
+         switch (f->fs.nat_mode) {
+         case NAT_MODE_NONE:
+                 break;
+         case NAT_MODE_DIP:
+-                set_nat_params(adap, f, tid, true, false, false, false);
++                set_nat_params(adap, f, true, false, false, false);
+                 break;
+         case NAT_MODE_DIP_DP:
+-                set_nat_params(adap, f, tid, true, false, true, false);
++                set_nat_params(adap, f, true, false, true, false);
+                 break;
+         case NAT_MODE_DIP_DP_SIP:
+-                set_nat_params(adap, f, tid, true, true, true, false);
++                set_nat_params(adap, f, true, true, true, false);
+                 break;
+         case NAT_MODE_DIP_DP_SP:
+-                set_nat_params(adap, f, tid, true, false, true, true);
++                set_nat_params(adap, f, true, false, true, true);
+                 break;
+         case NAT_MODE_SIP_SP:
+-                set_nat_params(adap, f, tid, false, true, false, true);
++                set_nat_params(adap, f, false, true, false, true);
+                 break;
+         case NAT_MODE_DIP_SIP_SP:
+-                set_nat_params(adap, f, tid, true, true, false, true);
++                set_nat_params(adap, f, true, true, false, true);
+                 break;
+         case NAT_MODE_ALL:
+-                set_nat_params(adap, f, tid, true, true, true, true);
++                set_nat_params(adap, f, true, true, true, true);
+                 break;
+         default:
+                 dev_err(adap->pdev_dev, "Invalid NAT mode: %d\n",
+@@ -1621,24 +1619,24 @@ void cxgb4_filter_hash_create_rpl(struct adapter *adap,
+         }
+ 
+         if (CHELSIO_CHIP_VERSION(adap->params.chip) >= CHELSIO_T7)
+-                set_tcb_field(adap, f, tid, TCB_T_FLAGS_W,
++                set_tcb_field(adap, f, TCB_T_FLAGS_W,
+                               TF_PEND_CTL1_V(1) | TF_PEND_CTL2_V(1),
+                               TF_PEND_CTL1_V(f->fs.eport & 0x1) |
+                               TF_PEND_CTL2_V((f->fs.eport >> 1) & 0x1), 1);
+ 
+         if (f->fs.eport >= NUM_UP_TSCH_CHANNEL_INSTANCES)
+-                set_tcb_tflag(adap, f, tid, TF_RECV_TSTMP_S, 1, 1);
++                set_tcb_tflag(adap, f, TF_RECV_TSTMP_S, 1, 1);
+ 
+         switch (f->fs.action) {
+         case FILTER_PASS:
+                 if (f->fs.dirsteer)
+-                        set_tcb_tflag(adap, f, tid, TF_DIRECT_STEER_S, 1, 1);
++                        set_tcb_tflag(adap, f, TF_DIRECT_STEER_S, 1, 1);
+                 break;
+         case FILTER_DROP:
+-                set_tcb_tflag(adap, f, tid, TF_DROP_S, 1, 1);
++                set_tcb_tflag(adap, f, TF_DROP_S, 1, 1);
+                 break;
+         case FILTER_SWITCH:
+-                set_tcb_tflag(adap, f, tid, TF_LPBK_S, 1, 1);
++                set_tcb_tflag(adap, f, TF_LPBK_S, 1, 1);
+                 break;
+         }
+ 
+@@ -1647,7 +1645,7 @@ void cxgb4_filter_hash_create_rpl(struct adapter *adap,
+                  * set Non-offload bit to 0 - to achieve
+                  * Drop action with Hash filters
+                  */
+-                set_tcb_field(adap, f, tid, TCB_T_FLAGS_W,
++                set_tcb_field(adap, f, TCB_T_FLAGS_W,
+                               TF_NON_OFFLOAD_V(1) | TF_MIGRATING_V(1),
+                               TF_MIGRATING_V(1), 1);
+         }
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index 1c02eccee533..ac0d8930f974 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -2174,6 +2174,30 @@ static void notify_ulds(struct adapter *adap, enum cxgb4_state new_state)
+ 	}
+ }
+ 
++int cxgb4_read_pbl_entries(struct net_device *dev, u32 pbl_addr, u64 len_b,
++		__be32 *pble)
++{
++	struct adapter *adap = netdev2adap(dev);
++	u64 addr = adap->uld_inst.vres.pbl.start + pbl_addr * 8;
++	int ret;
++
++	if (addr >= (adap->uld_inst.vres.pbl.start + adap->uld_inst.vres.pbl.size +
++				adap->uld_inst.vres.stor_pbl.size))
++		goto err;
++
++	spin_lock(&adap->win0_lock);
++	ret = t4_memory_rw_addr(adap, MEMWIN_NIC, addr, len_b, pble,
++			T4_MEMORY_READ);
++	spin_unlock(&adap->win0_lock);
++	return ret;
++
++err:
++	dev_err(adap->pdev_dev, "pbl_addr %#x, addr %#llx out of range\n",
++			pbl_addr, addr);
++	return -EINVAL;
++}
++EXPORT_SYMBOL(cxgb4_read_pbl_entries);
++
+ static void check_neigh_update(struct neighbour *neigh)
+ {
+ 	const struct device *parent;
+@@ -3566,9 +3590,7 @@ EXPORT_SYMBOL(cxgb4_fatal_err);
+ 
+ #define HMA_MAX_NO_FW_ADDRESS	(16 << 10)  /* FW supports 16K addresses */
+ 
+-#define HMA_PAGE_ORDER					\
+-	((HMA_PAGE_SIZE < HMA_MAX_NO_FW_ADDRESS) ?	\
+-	ilog2(HMA_MAX_NO_FW_ADDRESS / HMA_PAGE_SIZE) : 0)
++#define HMA_PAGE_ORDER ilog2((4 << 20) / HMA_PAGE_SIZE) /* Allocate pages of size page_size << page_order */
+ 
+ /* The minimum and maximum possible HMA sizes that can be specified in the FW
+  * configuration(in units of MB).
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_pci.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_pci.c
+index 09a50d350046..c3919c33c080 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_pci.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_pci.c
+@@ -140,7 +140,7 @@ int cxgb4_pci_chip_init(struct adapter *adap)
+                return 0;
+        }
+ 
+-       ret = dma_set_mask_and_coherent(adap->pdev_dev, DMA_BIT_MASK(64));
++       ret = dma_set_mask_and_coherent(adap->pdev_dev, DMA_BIT_MASK(60));
+        if (ret) {
+                dev_err(adap->pdev_dev, "no usable DMA configuration\n");
+                goto out_free_mbox_log;
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_thermal.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_thermal.c
+index b08356060fb4..40d4631a7a4c 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_thermal.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_thermal.c
+@@ -13,8 +13,8 @@ static int cxgb4_thermal_get_temp(struct thermal_zone_device *tzdev,
+ 				  int *temp)
+ {
+ 	struct adapter *adap = thermal_zone_device_priv(tzdev);
+-	u32 param, val;
+-	int ret;
++	u32 param;
++	int ret, val;
+ 
+ 	param = (FW_PARAMS_MNEM_V(FW_PARAMS_MNEM_DEV) |
+ 		 FW_PARAMS_PARAM_X_V(FW_PARAMS_PARAM_DEV_DIAG) |
+@@ -22,7 +22,7 @@ static int cxgb4_thermal_get_temp(struct thermal_zone_device *tzdev,
+ 
+ 	ret = t4_query_params(adap, adap->mbox, adap->pf, 0, 1,
+ 			      &param, &val);
+-	if (ret < 0 || val == 0)
++	if (ret < 0 )
+ 		return -1;
+ 
+ 	*temp = val * 1000;
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h
+index 2e4c06adbf48..82df4203d740 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h
+@@ -617,6 +617,7 @@ struct sk_buff *cxgb4_pktgl_to_skb(const struct pkt_gl *gl,
+ void t4_pktgl_free(const struct pkt_gl *gl);
+ int cxgb4_flush_eq_cache(struct net_device *dev);
+ int cxgb4_read_tpte(struct net_device *dev, u32 stag, __be32 *tpte);
++int cxgb4_read_pbl_entries(struct net_device *dev, u32 pbl_addr, u64 len, __be32 *pble);
+ u64 cxgb4_read_sge_timestamp(struct net_device *dev);
+ 
+ enum cxgb4_bar2_qtype { CXGB4_BAR2_QTYPE_EGRESS, CXGB4_BAR2_QTYPE_INGRESS };
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+index 986b1aa7fe48..d403c4887011 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+@@ -2750,7 +2750,7 @@ int t4_mgmt_tx(struct adapter *adap, struct sk_buff *skb)
+ static u32 cxgb4_sge_uld_ctrlq_index(struct net_device *dev,
+                                     enum cxgb4_uld_type uld)
+ {
+-       u32 index = cxgb4_port_chan(dev) * MAX_UP_CORES;
++       u32 index = cxgb4_port_chan(dev) * netdev2adap(dev)->params.num_up_cores;
+ 
+        switch (uld) {
+        case CXGB4_ULD_RDMA:
+@@ -4110,7 +4110,7 @@ static void cxgb4_sge_rx_timer_cb(struct timer_list *t)
+ 			struct sge_eth_rxq *rxq;
+ 			struct sge_fl *fl;
+ 
+-			fl = cxgb4_sge_egr_map_get(&s->egr_map, id);
++			fl = cxgb4_sge_egr_map_get(&s->egr_map, s->egr_start + id);
+ 			clear_bit(id, s->starving_fl);
+ 			smp_mb__after_atomic();
+ 
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+index 3f1811a2f503..243b3b4374cb 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+@@ -563,6 +563,174 @@ void t4_pcie_mem_access_offset_write(struct adapter *adap, u64 off, int win,
+ 	t4_read_reg(adap, reg); /* Flush */
+ }
+ 
++/**
++ *      t4_memory_rw_addr - read/write adapter memory via PCIE memory window
++ *      @adap: the adapter
++ *      @win: PCI-E Memory Window to use
++ *      @addr: address within adapter memory
++ *      @len: amount of memory to transfer
++ *      @hbuf: host memory buffer
++ *      @dir: direction of transfer T4_MEMORY_READ (1) or T4_MEMORY_WRITE (0)
++ *
++ *      Reads/writes an [almost] arbitrary memory region in the firmware: the
++ *      firmware memory address and host buffer must be aligned on 32-bit
++ *      boudaries; the length may be arbitrary.
++ *
++ *      NOTES:
++ *       1. The memory is transferred as a raw byte sequence from/to the
++ *          firmware's memory.  If this memory contains data structures which
++ *          contain multi-byte integers, it's the caller's responsibility to
++ *          perform appropriate byte order conversions.
++ *
++ *       2. It is the Caller's responsibility to ensure that no other code
++ *          uses the specified PCI-E Memory Window while this routine is
++ *          using it.  This is typically done via the use of OS-specific
++ *          locks, etc.
++ */
++int t4_memory_rw_addr(struct adapter *adap, int win, u64 addr,
++		u64 len, void *hbuf, int dir)
++{
++	u64 pos, offset, resid, mem_aperture;
++	u32 win_pf, mem_reg, mem_base;
++	u32 *buf;
++
++	/* Argument sanity checks ...
++	*/
++	if (addr & 0x3 || (uintptr_t)hbuf & 0x3)
++		return -EINVAL;
++	buf = (u32 *)hbuf;
++
++	/* It's convenient to be able to handle lengths which aren't a
++	 * multiple of 32-bits because we often end up transferring files to
++	 * the firmware.  So we'll handle that by normalizing the length here
++	 * and then handling any residual transfer at the end.
++	 */
++	resid = len & 0x3;
++	len -= resid;
++
++	/* Each PCI-E Memory Window is programmed with a window size -- or
++	 * "aperture" -- which controls the granularity of its mapping onto
++	 * adapter memory.  We need to grab that aperture in order to know
++	 * how to use the specified window.  The window is also programmed
++	 * with the base address of the Memory Window in BAR0's address
++	 * space.  For T4 this is an absolute PCI-E Bus Address.  For T5
++	 * the address is relative to BAR0.
++	 */
++	mem_reg = t4_read_reg(adap, t4_pcie_mem_access_base_win_reg(adap, win));
++
++	/* a dead adapter will return 0xffffffff for PIO reads */
++	if (mem_reg == 0xffffffff) {
++		CH_WARN(adap, "Unable to read PCI-E Memory Window Base[%d]\n",
++				win);
++		return -ENXIO;
++	}
++
++	mem_aperture = 1ULL << (WINDOW_G(mem_reg) + WINDOW_SHIFT_X);
++	mem_base = PCIEOFST_G(mem_reg) << PCIEOFST_SHIFT_X;
++	if (is_t4(adap->params.chip))
++		mem_base -= adap->t4_bar0;
++	win_pf = is_t4(adap->params.chip) ? 0 : PFNUM_V(adap->pf);
++
++	/* Calculate our initial PCI-E Memory Window Position and Offset into
++	 * that Window.
++	 */
++	pos = addr & ~(mem_aperture - 1);
++	offset = addr - pos;
++
++	/* Set up initial PCI-E Memory Window to cover the start of our
++	 * transfer.  (Read it back to ensure that changes propagate before we
++	 * attempt to use the new value.)
++	 */
++	t4_pcie_mem_access_offset_write(adap, pos, win, win_pf);
++
++	/* Transfer data to/from the adapter as long as there's an integral
++	 * number of 32-bit transfers to complete.
++	 *
++	 * A note on Endianness issues:
++	 *
++	 * The "register" reads and writes below from/to the PCI-E Memory
++	 * Window invoke the standard adapter Big-Endian to PCI-E Link
++	 * Little-Endian "swizzel."  As a result, if we have the following
++	 * data in adapter memory:
++	 *
++	 *     Memory:  ... | b0 | b1 | b2 | b3 | ...
++	 *     Address:      i+0  i+1  i+2  i+3
++	 *
++	 * Then a read of the adapter memory via the PCI-E Memory Window
++	 * will yield:
++	 *
++	 *     x = readl(i)
++	 *         31                  0
++	 *         [ b3 | b2 | b1 | b0 ]
++	 *
++	 * If this value is stored into local memory on a Little-Endian system
++	 * it will show up correctly in local memory as:
++	 *
++	 *     ( ..., b0, b1, b2, b3, ... )
++	 *
++	 * But on a Big-Endian system, the store will show up in memory
++	 * incorrectly swizzled as:
++	 *
++	 *     ( ..., b3, b2, b1, b0, ... )
++	 *
++	 * So we need to account for this in the reads and writes to the
++	 * PCI-E Memory Window below by undoing the register read/write
++	 * swizzels.
++	 */
++	while (len > 0) {
++		if (dir == T4_MEMORY_READ)
++			*buf++ = le32_to_cpu((__force __le32)t4_read_reg(adap,
++						mem_base + offset));
++		else
++			t4_write_reg(adap, mem_base + offset,
++					(__force u32)cpu_to_le32(*buf++));
++		offset += sizeof(__be32);
++		len -= sizeof(__be32);
++
++		/* If we've reached the end of our current window aperture,
++		 * move the PCI-E Memory Window on to the next.  Note that
++		 * doing this here after "len" may be 0 allows us to set up
++		 * the PCI-E Memory Window for a possible final residual
++		 * transfer below ...
++		 */
++		if (offset == mem_aperture) {
++			pos += mem_aperture;
++			offset = 0;
++			t4_pcie_mem_access_offset_write(adap, pos, win, win_pf);
++		}
++	}
++
++	/* If the original transfer had a length which wasn't a multiple of
++	 * 32-bits, now's where we need to finish off the transfer of the
++	 * residual amount.  The PCI-E Memory Window has already been moved
++	 * above (if necessary) to cover this final transfer.
++	 */
++	if (resid) {
++		union {
++			u32 word;
++			char byte[4];
++		} last;
++		unsigned char *bp;
++		int i;
++
++		if (dir == T4_MEMORY_READ) {
++			last.word = le32_to_cpu(
++					(__force __le32)t4_read_reg(adap,
++						mem_base + offset));
++			for (bp = (unsigned char *)buf, i = resid; i < 4; i++)
++				bp[i] = last.byte[i];
++		} else {
++			last.word = *buf;
++			for (i = resid; i < 4; i++)
++				last.byte[i] = 0;
++			t4_write_reg(adap, mem_base + offset,
++					(__force u32)cpu_to_le32(last.word));
++		}
++	}
++
++	return 0;
++}
++
+ /**
+  * t4_memory_rw_init - Get memory window relative offset, base, and size.
+  * @adap: the adapter
+diff --git a/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c b/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c
+index 2fbe0f059a0b..79b3b1d1b8ba 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c
+@@ -172,9 +172,18 @@ void t4vf_os_link_changed(struct adapter *adapter, int pidx, int link_ok)
+ 		case 40000:
+ 			s = "40Gbps";
+ 			break;
++		case 50000:
++			s = "50Gbps";
++			break;
+ 		case 100000:
+ 			s = "100Gbps";
+ 			break;
++		case 200000:
++			s = "200Gbps";
++			break;
++		case 400000:
++			s = "400Gbps";
++			break;
+ 
+ 		default:
+ 			s = "unknown";
+@@ -1278,7 +1287,9 @@ static int from_fw_port_mod_type(enum fw_port_type port_type,
+ 		   port_type == FW_PORT_TYPE_CR4_QSFP ||
+ 		   port_type == FW_PORT_TYPE_CR_QSFP ||
+ 		   port_type == FW_PORT_TYPE_CR2_QSFP ||
+-		   port_type == FW_PORT_TYPE_SFP28) {
++		   port_type == FW_PORT_TYPE_SFP28 ||
++		   port_type == FW_PORT_TYPE_SFP56 ||
++		   port_type == FW_PORT_TYPE_QSFP56){
+ 		if (mod_type == FW_PORT_MOD_TYPE_LR ||
+ 		    mod_type == FW_PORT_MOD_TYPE_SR ||
+ 		    mod_type == FW_PORT_MOD_TYPE_ER ||
+@@ -1403,6 +1414,20 @@ static void fw_caps_to_lmm(enum fw_port_type port_type,
+ 		FW_CAPS_TO_LMM(SPEED_50G, 50000baseSR2_Full);
+ 		break;
+ 
++	case FW_PORT_TYPE_SFP56:
++		SET_LMM(FIBRE);
++		FW_CAPS_TO_LMM(SPEED_50G, 50000baseSR2_Full);
++		FW_CAPS_TO_LMM(SPEED_25G, 25000baseCR_Full);
++		break;
++
++	case FW_PORT_TYPE_QSFP56:
++		SET_LMM(FIBRE);
++		FW_CAPS_TO_LMM(SPEED_200G, 200000baseSR2_Full);
++		FW_CAPS_TO_LMM(SPEED_100G, 100000baseCR4_Full);
++		FW_CAPS_TO_LMM(SPEED_50G, 50000baseSR2_Full);
++		FW_CAPS_TO_LMM(SPEED_25G, 25000baseCR_Full);
++		break;
++
+ 	case FW_PORT_TYPE_KR4_100G:
+ 	case FW_PORT_TYPE_CR4_QSFP:
+ 		SET_LMM(FIBRE);
+@@ -2921,7 +2946,7 @@ static int cxgb4vf_pci_probe(struct pci_dev *pdev,
+ 	/*
+ 	 * Set up our DMA mask
+ 	 */
+-	err = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
++	err = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(60));
+ 	if (err) {
+ 		dev_err(&pdev->dev, "no usable DMA configuration\n");
+ 		goto err_release_regions;
+-- 
+2.39.1
+
