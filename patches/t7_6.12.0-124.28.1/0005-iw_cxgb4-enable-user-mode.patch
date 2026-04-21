@@ -1,0 +1,120 @@
+From bd0a894677c784b97e8c429d09a22d3e5c1f23de Mon Sep 17 00:00:00 2001
+From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
+Date: Mon, 20 Apr 2026 20:12:08 -0400
+Subject: [PATCH 5/5] iw_cxgb4: enable user mode
+
+---
+ drivers/infiniband/hw/cxgb4/cq.c       | 2 ++
+ drivers/infiniband/hw/cxgb4/iw_cxgb4.h | 2 +-
+ drivers/infiniband/hw/cxgb4/provider.c | 2 +-
+ drivers/infiniband/hw/cxgb4/qp.c       | 7 +++++++
+ 4 files changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/cq.c b/drivers/infiniband/hw/cxgb4/cq.c
+index 9dd3a3a69635..1828ab3507bc 100644
+--- a/drivers/infiniband/hw/cxgb4/cq.c
++++ b/drivers/infiniband/hw/cxgb4/cq.c
+@@ -1503,6 +1503,7 @@ int c4iw_create_cq(struct ib_cq *ibcq, const struct ib_cq_init_attr *attr,
+ 		mm->vaddr = chp->cq.queue;
+ 		mm->dma_addr = chp->cq.dma_addr;
+ 		mm->len = chp->cq.memsize;
++		insert_flag_to_mmap(&rhp->rdev, mm, mm->addr);
+ 		insert_mmap(ucontext, mm);
+ 
+ 		mm2->key = uresp.gts_key;
+@@ -1510,6 +1511,7 @@ int c4iw_create_cq(struct ib_cq *ibcq, const struct ib_cq_init_attr *attr,
+ 		mm2->len = PAGE_SIZE;
+ 		mm2->vaddr = NULL;
+ 		mm2->dma_addr = 0;
++		insert_flag_to_mmap(&rhp->rdev, mm2, mm2->addr);
+ 		insert_mmap(ucontext, mm2);
+ 	}
+ 
+diff --git a/drivers/infiniband/hw/cxgb4/iw_cxgb4.h b/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
+index 0dbea81db6cd..42de67c647b7 100644
+--- a/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
++++ b/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
+@@ -68,7 +68,7 @@
+ #include "cxgb4_uld.h"
+ #include "cxgb4_rdma_resource.h"
+ #include "l2t.h"
+-#include <uapi/rdma/cxgb4-abi.h>
++#include <rdma/cxgb4-abi.h>
+ 
+ #define DRV_NAME "iw_cxgb4"
+ #define MOD DRV_NAME ":"
+diff --git a/drivers/infiniband/hw/cxgb4/provider.c b/drivers/infiniband/hw/cxgb4/provider.c
+index e3e1bc092fa9..b79ca9d41ca3 100644
+--- a/drivers/infiniband/hw/cxgb4/provider.c
++++ b/drivers/infiniband/hw/cxgb4/provider.c
+@@ -692,7 +692,7 @@ static void get_dev_fw_str(struct ib_device *dev, char *str)
+ static const struct ib_device_ops c4iw_common_dev_ops = {
+ 	.owner = THIS_MODULE,
+ 	.driver_id = RDMA_DRIVER_CXGB4,
+-	.uverbs_abi_ver = C4IW_UVERBS_ABI_VERSION,
++	.uverbs_abi_ver = 8,
+ 
+ 	.alloc_hw_device_stats = c4iw_alloc_device_stats,
+ 	.get_hw_stats = c4iw_get_mib,
+diff --git a/drivers/infiniband/hw/cxgb4/qp.c b/drivers/infiniband/hw/cxgb4/qp.c
+index 647217b494bf..34ce0c2f860a 100644
+--- a/drivers/infiniband/hw/cxgb4/qp.c
++++ b/drivers/infiniband/hw/cxgb4/qp.c
+@@ -5235,6 +5235,7 @@ static int create_rc_qp(struct ib_qp *qp, struct ib_qp_init_attr *attrs,
+ 		sq_key_mm->vaddr = qhp->wq.sq.queue;
+ 		sq_key_mm->dma_addr = qhp->wq.sq.dma_addr;
+ 		sq_key_mm->len = PAGE_ALIGN(qhp->wq.sq.memsize);
++		insert_flag_to_mmap(&rhp->rdev, sq_key_mm, sq_key_mm->addr);
+ 		insert_mmap(ucontext, sq_key_mm);
+ 		if (!attrs->srq) {
+ 			rq_key_mm->key = uresp.rq_key;
+@@ -5242,6 +5243,7 @@ static int create_rc_qp(struct ib_qp *qp, struct ib_qp_init_attr *attrs,
+ 			rq_key_mm->vaddr = qhp->wq.rq.queue;
+ 			rq_key_mm->dma_addr = qhp->wq.rq.dma_addr;
+ 			rq_key_mm->len = PAGE_ALIGN(qhp->wq.rq.memsize);
++			insert_flag_to_mmap(&rhp->rdev, rq_key_mm, rq_key_mm->addr);
+ 			insert_mmap(ucontext, rq_key_mm);
+ 		}
+ 		sq_db_key_mm->key = uresp.sq_db_gts_key;
+@@ -5249,6 +5251,7 @@ static int create_rc_qp(struct ib_qp *qp, struct ib_qp_init_attr *attrs,
+ 		sq_db_key_mm->vaddr = NULL;
+ 		sq_db_key_mm->dma_addr = 0;
+ 		sq_db_key_mm->len = PAGE_SIZE;
++		insert_flag_to_mmap(&rhp->rdev, sq_db_key_mm, sq_db_key_mm->addr);
+ 		insert_mmap(ucontext, sq_db_key_mm);
+ 		if (!attrs->srq) {
+ 			rq_db_key_mm->key = uresp.rq_db_gts_key;
+@@ -5256,6 +5259,7 @@ static int create_rc_qp(struct ib_qp *qp, struct ib_qp_init_attr *attrs,
+ 			rq_db_key_mm->len = PAGE_SIZE;
+ 			rq_db_key_mm->vaddr = NULL;
+ 			rq_db_key_mm->dma_addr = 0;
++			insert_flag_to_mmap(&rhp->rdev, rq_db_key_mm, rq_db_key_mm->addr);
+ 			insert_mmap(ucontext, rq_db_key_mm);
+ 		}
+ 		if (ma_sync_key_mm) {
+@@ -5265,6 +5269,7 @@ static int create_rc_qp(struct ib_qp *qp, struct ib_qp_init_attr *attrs,
+ 			ma_sync_key_mm->len = PAGE_SIZE;
+ 			ma_sync_key_mm->vaddr = NULL;
+ 			ma_sync_key_mm->dma_addr = 0;
++			insert_flag_to_mmap(&rhp->rdev, ma_sync_key_mm, ma_sync_key_mm->addr);
+ 			insert_mmap(ucontext, ma_sync_key_mm);
+ 		}
+ 
+@@ -6267,12 +6272,14 @@ static int create_srq(struct ib_srq *ib_srq, struct ib_srq_init_attr *attrs,
+ 		srq_key_mm->len = PAGE_ALIGN(srq->wq.memsize);
+ 		srq_key_mm->vaddr = srq->wq.queue;
+ 		srq_key_mm->dma_addr = srq->wq.dma_addr;
++		insert_flag_to_mmap(&rhp->rdev, srq_key_mm, srq_key_mm->addr);
+ 		insert_mmap(ucontext, srq_key_mm);
+ 		srq_db_key_mm->key = uresp.srq_db_gts_key;
+ 		srq_db_key_mm->addr = srq->wq.db_pa;
+ 		srq_db_key_mm->len = PAGE_SIZE;
+ 		srq_db_key_mm->vaddr = NULL;
+ 		srq_db_key_mm->dma_addr = 0;
++		insert_flag_to_mmap(&rhp->rdev, srq_db_key_mm, srq_db_key_mm->addr);
+ 		insert_mmap(ucontext, srq_db_key_mm);
+ 	}
+ 
+-- 
+2.39.1
+
