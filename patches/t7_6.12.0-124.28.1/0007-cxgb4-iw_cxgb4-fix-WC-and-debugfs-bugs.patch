@@ -1,0 +1,92 @@
+From 57259a73f3b042dcdc098c83beea8b3e581ea54b Mon Sep 17 00:00:00 2001
+From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
+Date: Thu, 14 May 2026 22:26:50 -0400
+Subject: [PATCH 7/7] cxgb4/iw_cxgb4: fix WC and debugfs bugs
+
+Disable WC for RDMA
+fix TPT entry read in interrupt/atomic context
+---
+ drivers/infiniband/hw/cxgb4/qp.c                |  6 +-----
+ drivers/infiniband/hw/cxgb4/t4.h                |  4 ++--
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 15 ++-------------
+ 3 files changed, 5 insertions(+), 20 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/qp.c b/drivers/infiniband/hw/cxgb4/qp.c
+index d53d021bc5b9..4c9cf7ebf12f 100644
+--- a/drivers/infiniband/hw/cxgb4/qp.c
++++ b/drivers/infiniband/hw/cxgb4/qp.c
+@@ -68,14 +68,10 @@ static int max_fr_immd = T4_MAX_FR_IMMD;
+ module_param(max_fr_immd, int, 0644);
+ MODULE_PARM_DESC(max_fr_immd, "fastreg threshold for using DSGL instead of immediate");
+ 
+-#ifdef ARCH_HAS_IOREMAP_WC
+-int t5_en_wc = 1;
+-#else
+ int t5_en_wc = 0;
+-#endif
+ 
+ module_param(t5_en_wc, int, 0644);
+-MODULE_PARM_DESC(t5_en_wc, "Use BAR2/WC path for kernel users (default 1)");
++MODULE_PARM_DESC(t5_en_wc, "Use BAR2/WC path for kernel users (default 0)");
+ 
+ u32 cxgb4_uld_ocqp_pool_alloc(struct net_device *dev, int size)
+ {
+diff --git a/drivers/infiniband/hw/cxgb4/t4.h b/drivers/infiniband/hw/cxgb4/t4.h
+index 926fe2a3d0b8..0473cfbd99a6 100644
+--- a/drivers/infiniband/hw/cxgb4/t4.h
++++ b/drivers/infiniband/hw/cxgb4/t4.h
+@@ -655,7 +655,7 @@ static inline void t4_ring_sq_db(struct t4_wq *wq, u16 inc, union t4_wr *wqe)
+ 	/* Flush host queue memory writes. */
+ 	wmb();
+ 	if (wq->sq.bar2_va) {
+-		if (inc == 1 && wq->sq.bar2_qid == 0 && wqe) {
++		if (t5_en_wc && inc == 1 && wq->sq.bar2_qid == 0 && wqe) {
+ 			pr_debug("WC wq->sq.pidx = %d\n", wq->sq.pidx);
+ 			pio_copy((u64 __iomem *)
+ 				 (wq->sq.bar2_va + SGE_UDB_WCDOORBELL),
+@@ -681,7 +681,7 @@ static inline void t4_ring_rq_db(struct t4_wq *wq, u16 inc,
+ 	/* Flush host queue memory writes. */
+ 	wmb();
+ 	if (wq->rq.bar2_va) {
+-		if (inc == 1 && wq->rq.bar2_qid == 0 && wqe) {
++		if (t5_en_wc && inc == 1 && wq->rq.bar2_qid == 0 && wqe) {
+ 			pr_debug("WC wq->rq.pidx = %d\n", wq->rq.pidx);
+ 			pio_copy((u64 __iomem *)
+ 				 (wq->rq.bar2_va + SGE_UDB_WCDOORBELL),
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index de31f6723108..58faf890ec98 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -1989,8 +1989,6 @@ EXPORT_SYMBOL(cxgb4_flush_eq_cache);
+ int cxgb4_read_tpte(struct net_device *dev, u32 stag, __be32 *tpte)
+ {
+ 	struct adapter *adap = netdev2adap(dev);
+-	unsigned long mtype = 0;//, maddr = 0;
+-	u32 params[7], val[7];
+ 	u64 addr = adap->uld_inst.vres.stag.start + ((stag >> 8) * 32);
+ 	int ret;
+ 
+@@ -1998,18 +1996,9 @@ int cxgb4_read_tpte(struct net_device *dev, u32 stag, __be32 *tpte)
+ 			adap->uld_inst.vres.stor_stag.size))
+ 		goto err;
+ 
+-	params[0] = (FW_PARAMS_MNEM_V(FW_PARAMS_MNEM_DEV) |
+-			FW_PARAMS_PARAM_X_V(FW_PARAMS_PARAM_DEV_CF));
+-	ret = t4_query_params(adap, adap->mbox, adap->pf, 0, 1, params, val);
+-	if (ret != 0)
+-		goto err;
+-
+-	mtype = FW_PARAMS_PARAM_Y_G(val[0]);
+-	//maddr = FW_PARAMS_PARAM_Z_G(val[0]) << 16;
+-
+ 	spin_lock(&adap->win0_lock);
+-	ret = t4_memory_rw(adap, MEMWIN_NIC, mtype, addr, 32, tpte,
+-			T4_MEMORY_READ);
++	ret = t4_memory_rw_addr(adap, MEMWIN_NIC, addr, 32, tpte,
++				T4_MEMORY_READ);
+ 	spin_unlock(&adap->win0_lock);
+ 
+ 	return ret;
+-- 
+2.39.1
+
