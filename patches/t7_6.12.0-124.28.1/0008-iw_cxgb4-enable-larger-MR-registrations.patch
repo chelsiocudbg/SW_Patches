@@ -1,0 +1,134 @@
+From 4b99cef1d5ea46bae88d4c124b3567e06dd2213d Mon Sep 17 00:00:00 2001
+From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
+Date: Sat, 16 May 2026 00:36:32 -0400
+Subject: [PATCH 8/9] iw_cxgb4: enable larger MR registrations
+
+This relies on the assumption that app is registering memory backed by
+physically contiguous pages.
+---
+ drivers/infiniband/hw/cxgb4/mem.c      | 26 +++++++++++++-------------
+ drivers/infiniband/hw/cxgb4/provider.c |  9 +++++----
+ drivers/infiniband/hw/cxgb4/t4.h       |  1 +
+ 3 files changed, 19 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/mem.c b/drivers/infiniband/hw/cxgb4/mem.c
+index 570bb91c0e81..96acd7070327 100644
+--- a/drivers/infiniband/hw/cxgb4/mem.c
++++ b/drivers/infiniband/hw/cxgb4/mem.c
+@@ -51,13 +51,6 @@ static int inline_threshold = C4IW_INLINE_THRESHOLD;
+ module_param(inline_threshold, int, 0644);
+ MODULE_PARM_DESC(inline_threshold, "inline vs dsgl threshold (default=128)");
+ 
+-static int mr_exceeds_hw_limits(struct c4iw_dev *dev, u64 length)
+-{
+-	return (is_t4(dev->rdev.lldi.adapter_type) ||
+-		is_t5(dev->rdev.lldi.adapter_type)) &&
+-		length >= 8*1024*1024*1024ULL;
+-}
+-
+ static int _c4iw_write_mem_dma_aligned(struct c4iw_rdev *rdev, u32 addr,
+ 				       u32 len, dma_addr_t data,
+ 				       struct sk_buff *skb,
+@@ -508,6 +501,7 @@ struct ib_mr *c4iw_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
+ {
+ 	__be64 *pages;
+ 	int shift, n, i;
++	unsigned long page_size;
+ 	int err = -ENOMEM;
+ 	struct ib_block_iter biter;
+ 	struct c4iw_dev *rhp;
+@@ -525,9 +519,6 @@ struct ib_mr *c4iw_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
+ 	php = to_c4iw_pd(pd);
+ 	rhp = php->rhp;
+ 
+-	if (mr_exceeds_hw_limits(rhp, length))
+-		return ERR_PTR(-EINVAL);
+-
+ 	mhp = kzalloc(sizeof(*mhp), GFP_KERNEL);
+ 	if (!mhp)
+ 		return ERR_PTR(-ENOMEM);
+@@ -545,9 +536,18 @@ struct ib_mr *c4iw_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
+ 	if (IS_ERR(mhp->umem))
+ 		goto err_free_skb;
+ 
+-	shift = PAGE_SHIFT;
++	page_size = ib_umem_find_best_pgsz(mhp->umem,
++			(CHELSIO_CHIP_VERSION(rhp->rdev.lldi.adapter_type) < CHELSIO_T7) ? 
++					T4_PAGESIZE_MASK : T7_PAGESIZE_MASK, virt);
++	if (!page_size) {
++		pr_err("Find best page size failed, start %llu\n", virt);
++		err = -EINVAL;
++		goto err_umem_release;
++	}
++
++	shift = ilog2(page_size);
+ 
+-	n = ib_umem_num_dma_blocks(mhp->umem, 1 << shift);
++	n = ib_umem_num_dma_blocks(mhp->umem, page_size);
+ 	err = alloc_pbl(mhp, n);
+ 	if (err)
+ 		goto err_umem_release;
+@@ -560,7 +560,7 @@ struct ib_mr *c4iw_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
+ 
+ 	i = n = 0;
+ 
+-	rdma_umem_for_each_dma_block(mhp->umem, &biter, 1 << shift) {
++	rdma_umem_for_each_dma_block(mhp->umem, &biter, page_size) {
+ 		pages[i++] = cpu_to_be64(rdma_block_iter_dma_address(&biter));
+ 		if (i == PAGE_SIZE / sizeof(*pages)) {
+ 			err = write_pbl(&mhp->rhp->rdev, pages,
+diff --git a/drivers/infiniband/hw/cxgb4/provider.c b/drivers/infiniband/hw/cxgb4/provider.c
+index 23f3f2e731c6..47f4cebdb418 100644
+--- a/drivers/infiniband/hw/cxgb4/provider.c
++++ b/drivers/infiniband/hw/cxgb4/provider.c
+@@ -435,14 +435,15 @@ static int c4iw_query_device(struct ib_device *ibdev, struct ib_device_attr *pro
+ 			     struct ib_udata *uhw)
+ {
+ 
+-	struct c4iw_dev *dev;
++	struct c4iw_dev *dev = to_c4iw_dev(ibdev);
++	u32 chip_ver = CHELSIO_CHIP_VERSION(dev->rdev.lldi.adapter_type);
++
+ 
+ 	pr_debug("ibdev %p\n", ibdev);
+ 
+ 	if (uhw->inlen || uhw->outlen)
+ 		return -EINVAL;
+ 
+-	dev = to_c4iw_dev(ibdev);
+ 	addrconf_addr_eui48((u8 *)&props->sys_image_guid,
+ 			    dev->rdev.lldi.ports[0]->dev_addr);
+ 	props->hw_ver = CHELSIO_CHIP_RELEASE(dev->rdev.lldi.adapter_type);
+@@ -451,7 +452,7 @@ static int c4iw_query_device(struct ib_device *ibdev, struct ib_device_attr *pro
+ 	props->kernel_cap_flags = IBK_LOCAL_DMA_LKEY;
+ 	if (fastreg_support)
+ 		props->device_cap_flags |= IB_DEVICE_MEM_MGT_EXTENSIONS;
+-	props->page_size_cap = T4_PAGESIZE_MASK;
++	props->page_size_cap = (chip_ver >= CHELSIO_T7) ? T7_PAGESIZE_MASK : T4_PAGESIZE_MASK;
+ 	props->vendor_id = (u32)dev->rdev.lldi.pdev->vendor;
+ 	props->vendor_part_id = (u32)dev->rdev.lldi.pdev->device;
+ 	props->max_mr_size = T4_MAX_MR_SIZE;
+@@ -462,7 +463,7 @@ static int c4iw_query_device(struct ib_device *ibdev, struct ib_device_attr *pro
+ 	props->max_send_sge = min(T4_MAX_SEND_SGE, T4_MAX_WRITE_SGE);
+ 	props->max_recv_sge = T4_MAX_RECV_SGE;
+ 	props->max_srq_sge = T4_MAX_RECV_SGE;
+-	props->max_sge_rd = (roce_mode && (CHELSIO_CHIP_VERSION(dev->rdev.lldi.adapter_type) >= CHELSIO_T7)) ? T7_MAX_RD_SGE : 1;
++	props->max_sge_rd = (roce_mode && (chip_ver >= CHELSIO_T7)) ? T7_MAX_RD_SGE : 1;
+ 	props->max_res_rd_atom = dev->rdev.lldi.max_ird_adapter;
+ 	props->max_qp_rd_atom = min(dev->rdev.lldi.max_ordird_qp,
+ 				    c4iw_max_read_depth);
+diff --git a/drivers/infiniband/hw/cxgb4/t4.h b/drivers/infiniband/hw/cxgb4/t4.h
+index 0473cfbd99a6..fc48c975c476 100644
+--- a/drivers/infiniband/hw/cxgb4/t4.h
++++ b/drivers/infiniband/hw/cxgb4/t4.h
+@@ -40,6 +40,7 @@
+ 
+ #define T4_MAX_MR_SIZE (~0ULL)
+ #define T4_PAGESIZE_MASK 0xffff000  /* 4KB-128MB */
++#define T7_PAGESIZE_MASK 0x1fffff000 /* 4KB-4GB */
+ #define T4_STAG_UNSET 0xffffffff
+ #define T4_FW_MAJ 0
+ #define PCIE_MA_SYNC_A 0x30b4
+-- 
+2.39.1
+
