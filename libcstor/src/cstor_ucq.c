@@ -37,8 +37,8 @@
 #include <netinet/in.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
+
 #include "cstor_umain.h"
-#include "cstor_ioctl.h"
 
 static const char *cstor_send_status_str[CSTOR_SEND_ERR_MAX] = {
 	[CSTOR_SEND_SUCCESS]				= "send success",
@@ -98,6 +98,7 @@ static const char *cstor_nvme_tcp_status[CSTOR_NVME_TCP_MAX_STATUS] = {
 	[CSTOR_NVME_TCP_TPT_WRAP_ERR] = "tpt wrap err",
 	[CSTOR_NVME_TCP_TPT_BOUND_ERR] = "tpt bound err",
 	[CSTOR_NVME_TCP_TPT_LPDU_UNALIGNED_ERR] = "tpt last pdu unaligned err",
+	[CSTOR_NVME_TCP_SEQ_MISMATCH_ERR] = "tcp seq number mismatch err",
 };
 
 const char *cstor_get_nvme_tcp_status_str(u8 status)
@@ -227,12 +228,21 @@ int cstor_destroy_cq(struct cstor_cq *cq)
 	return 0;
 }
 
+struct nvme_tcp_common_hdr {
+	u8 type;
+	u8 flags;
+	u8 hlen;
+	u8 pdo;
+	__le32 plen;
+};
+
 static void
 cstor_cpl_nvmt_cmp_imm(struct cstor_usock *ucsk, struct cpl_nvmt_cmp_imm *cpl,
 		       struct cstor_nvme_tcp_wc *wc)
 {
 	struct cstor_uqp *uqp = ucsk->uqp;
 	struct t4_wq *wq = &uqp->wq;
+	struct nvme_tcp_common_hdr *hdr = NULL;
 	u16 len = be16toh(cpl->length);
 	u8 data_in_rq = G_CPL_NVMT_CMP_IMM_OPRQINC(be32toh(cpl->generation_bit_to_oprqinc)) & 1;
 
@@ -249,17 +259,31 @@ cstor_cpl_nvmt_cmp_imm(struct cstor_usock *ucsk, struct cpl_nvmt_cmp_imm *cpl,
 		abort();
 	}
 
+	if (unlikely(ucsk->rcv_nxt != wc->seq)) {
+		cstor_err(ucsk->ucdev, CSTOR_LOG, "tcp seq number mismatch, tid %u "
+			  "expected %#x received %#x\n", ucsk->csk.tid, ucsk->rcv_nxt, wc->seq);
+		wc->status = CSTOR_NVME_TCP_SEQ_MISMATCH_ERR;
+	}
+
 	if (len) {
-		memcpy(wc->hdr, (u8 *)cpl + 24, len);
+		memcpy(wc->hdr, cpl + 1, len);
 		wc->hlen = len;
+
+		hdr = (struct nvme_tcp_common_hdr *)wc->hdr;
 	}
 
 	if (data_in_rq) {
 		assert(wq->rq.wr_cidx < wq->rq.max_wr);
 		wc->ctx = wq->rq.sw_rq[wq->rq.wr_cidx].ctx;
+		if (!hdr)
+			hdr = wq->rq.sw_rq[wq->rq.wr_cidx].hdr;
 		assert(!t4_rq_empty(wq));
 		t4_rq_consume(wq);
 	}
+
+	assert(hdr);
+	ucsk->rcv_nxt += le32toh(hdr->plen);
+	uqp->recv_bytes += le32toh(hdr->plen);
 }
 
 static void
@@ -267,6 +291,7 @@ cstor_cpl_nvmt_cmp_srq(struct cstor_usock *ucsk, struct cpl_nvmt_cmp_srq *cpl,
 		       struct cstor_nvme_tcp_wc *wc)
 {
 	struct cstor_uqp *uqp = ucsk->uqp;
+	struct nvme_tcp_common_hdr *hdr = NULL;
 	u16 len = be16toh(cpl->length);
 	u8 data_in_rq = G_CPL_NVMT_CMP_IMM_OPRQINC(be32toh(cpl->generation_bit_to_oprqinc)) & 1;
 
@@ -283,9 +308,17 @@ cstor_cpl_nvmt_cmp_srq(struct cstor_usock *ucsk, struct cpl_nvmt_cmp_srq *cpl,
 		abort();
 	}
 
+	if (unlikely(ucsk->rcv_nxt != wc->seq)) {
+		cstor_err(ucsk->ucdev, CSTOR_LOG, "tcp seq number mismatch, tid %u "
+			  "expected %#x received %#x\n", ucsk->csk.tid, ucsk->rcv_nxt, wc->seq);
+		wc->status = CSTOR_NVME_TCP_SEQ_MISMATCH_ERR;
+	}
+
 	if (len) {
 		memcpy(wc->hdr, cpl + 1, len);
 		wc->hlen = len;
+
+		hdr = (struct nvme_tcp_common_hdr *)wc->hdr;
 	}
 
 	if (data_in_rq) {
@@ -299,8 +332,14 @@ cstor_cpl_nvmt_cmp_srq(struct cstor_usock *ucsk, struct cpl_nvmt_cmp_srq *cpl,
 		wq->sw_rq[rel_idx].valid = false;
 
 		wc->ctx = wq->sw_rq[rel_idx].ctx;
+		if (!hdr)
+			hdr = wq->sw_rq[rel_idx].hdr;
 		t4_srq_consume(wq);
 	}
+
+	assert(hdr);
+	ucsk->rcv_nxt += le32toh(hdr->plen);
+	uqp->recv_bytes += le32toh(hdr->plen);
 }
 
 static int
@@ -430,11 +469,12 @@ static int cstor_poll_cq_one(struct cstor_ucq *ucq, struct cstor_nvme_tcp_wc *wc
 		abort();
 	}
 
-	t4_cq_consume(&ucq->q, ucq->ucdev->plat_dev);
 	if (usrq)
 		cstor_spin_unlock(&usrq->lock);
-
 	cstor_spin_unlock(&uqp->lock);
+
+	t4_cq_consume(&ucq->q, ucq->ucdev->plat_dev);
+
 	return ret;
 }
 

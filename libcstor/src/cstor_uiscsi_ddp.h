@@ -87,7 +87,6 @@ struct cstor_ppm_zone {
 };
 
 struct cstor_ppm_pool {
-	u32 num_zones;
 	struct cstor_ppm_zone *zones;
 };
 

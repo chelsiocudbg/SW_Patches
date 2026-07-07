@@ -46,7 +46,6 @@
 #include <linux/pci.h>
 
 #include "cstor_umain.h"
-#include "cstor_ioctl.h"
 
 u64 cstor_page_size;
 u64 cstor_page_mask;
@@ -231,7 +230,7 @@ void cstor_close_devices(void)
 	pthread_mutex_unlock(&cstor_dev_lock);
 }
 
-static int __cstor_get_devices(void)
+static int __cstor_get_devices(u32 *num_cdev)
 {
 	struct cstor_udevice *ucdev, *tmp;
 	char devname[20] = {'\0'};
@@ -261,6 +260,8 @@ static int __cstor_get_devices(void)
 
 		ucdev->cdev.dev_fd = fd;
 		pthread_spin_init(&ucdev->lock, PTHREAD_PROCESS_PRIVATE);
+		pthread_mutex_init(&ucdev->mlock, NULL);
+
 		ret = cstor_alloc_udevice(ucdev);
 		if (ret) {
 			cstor_printf(stderr, CSTOR_NOLOG, "cstor_alloc_udevice() failed, "
@@ -270,7 +271,9 @@ static int __cstor_get_devices(void)
 			goto out;
 		}
 
+		ucdev->ref_count++;
 		list_add_tail(&devices, &ucdev->list);
+		(*num_cdev)++;
 	}
 
 	if (list_empty(&devices)) {
@@ -281,6 +284,8 @@ static int __cstor_get_devices(void)
 	return 0;
 
 out:
+	*num_cdev = 0;
+
 	list_for_each_safe(&devices, ucdev, tmp, list)
 		cstor_close_device(ucdev);
 
@@ -341,21 +346,22 @@ int cstor_open_devices(u32 *num_cdev)
 		return ret;
 	}
 
+	*num_cdev = 0;
+
 	pthread_mutex_lock(&cstor_dev_lock);
 	if (list_empty(&devices)) {
-		ret = __cstor_get_devices();
+		ret = __cstor_get_devices(num_cdev);
 		if (ret) {
 			cstor_printf(stderr, CSTOR_NOLOG,
 				     "__cstor_get_devices() failed, ret %d\n", ret);
 			pthread_mutex_unlock(&cstor_dev_lock);
 			return ret;
 		}
-	}
-
-	*num_cdev = 0;
-	list_for_each(&devices, ucdev, list) {
-		ucdev->ref_count++;
-		(*num_cdev)++;
+	} else {
+		list_for_each(&devices, ucdev, list) {
+			ucdev->ref_count++;
+			(*num_cdev)++;
+		}
 	}
 	pthread_mutex_unlock(&cstor_dev_lock);
 
@@ -387,11 +393,21 @@ cstor_fill_cstor_device_attr(struct cstor_device_attr *attr, struct _cstor_devic
 		return EINVAL;
 	}
 
-	for (i = 0; i < _attr->num_ports; i++)
+	for (i = 0; i < _attr->num_ports; i++) {
+		ret = snprintf(attr->iface_name[i], sizeof(attr->iface_name[i]), "%s",
+			       _attr->iface_name[i]);
+		if (ret < 0) {
+			cstor_printf(stderr, CSTOR_NOLOG,
+				     "snprintf() failed to format iface_name, ret %d\n", ret);
+			return EINVAL;
+		}
+
 		memcpy(&attr->mac_addr[i], &_attr->mac_addr[i], 6);
+	}
 
 	attr->vendor_id = _attr->vendor_id;
 	attr->vendor_part_id = _attr->vendor_part_id;
+	attr->numa_node_id = _attr->numa_node_id;
 	attr->hw_ver = _attr->hw_ver;
 	attr->max_qp = _attr->max_qp;
 	attr->max_qp_wr = _attr->max_qp_wr;

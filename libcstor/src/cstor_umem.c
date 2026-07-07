@@ -42,7 +42,6 @@
 #include <assert.h>
 
 #include "cstor_umain.h"
-#include "cstor_ioctl.h"
 
 struct cstor_mr *
 __cstor_reg_mr(struct cstor_sock *csk, struct cstor_pd *pd, void *addr, u64 length,

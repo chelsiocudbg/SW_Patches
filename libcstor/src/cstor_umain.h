@@ -41,10 +41,8 @@
 #include <sys/errno.h>
 #include <sys/time.h>
 #include <ccan/list.h>
+
 #include "cstor_udefs.h"
-#include "cstor_ioctl.h"
-#include "libcstor.h"
-#include "cstor_uiscsi_ddp.h"
 
 extern u64 cstor_page_size;
 extern u64 cstor_page_mask;
@@ -68,6 +66,7 @@ struct cstor_udevice {
 	struct cstor_ppm *iscsi_ppm;
 	struct list_node list;
 	pthread_spinlock_t lock;
+	pthread_mutex_t mlock;
 	u32 stid_base;
 	u32 tid_base;
 	u32 ref_count;
@@ -139,6 +138,7 @@ struct cstor_uqp {
 	u32 pbl_offset;
 	u32 max_ddp_sge;
 	u32 iscsi_ddp_page_size;
+	u32 recv_bytes;
 	u16 pend_cmpl_ndesc;
 	bool auto_cmpl;
 	bool mapped;
@@ -149,7 +149,6 @@ struct cstor_usrq {
 	struct cstor_udevice *ucdev;
 	struct t4_srq wq;
 	struct cstor_spin_lock lock;
-	__u32 flags;
 	bool mapped;
 };
 
@@ -166,16 +165,17 @@ struct cstor_urxq {
 
 #define CSTOR_LCSK_INADDR_ANY_PORT_ID 0xFF
 struct cstor_ulisten_sock {
-	struct cstor_listen_sock lcsk[CSTOR_MAX_PORTS];
+	struct cstor_listen_sock lcsk;
 	struct cstor_udevice *ucdev;
-	u32 num_sock;
-	u8 refcnt;
+	u32 refcnt;
 };
 
 struct cstor_usock {
 	struct cstor_sock csk;
 	struct cstor_udevice *ucdev;
 	struct cstor_uqp *uqp;
+	u32 snd_nxt;
+	u32 rcv_nxt;
 };
 
 enum fl_page_size_cap_order {
@@ -255,9 +255,7 @@ static inline struct cstor_umr *to_cstor_umr(struct cstor_mr *mr)
 
 static inline struct cstor_ulisten_sock *to_cstor_ulisten_sock(struct cstor_listen_sock *lcsk)
 {
-	u8 port_id = (lcsk->port_id == CSTOR_LCSK_INADDR_ANY_PORT_ID) ? 0 : lcsk->port_id;
-
-	return container_of(lcsk, struct cstor_ulisten_sock, lcsk[port_id]);
+	return container_of(lcsk, struct cstor_ulisten_sock, lcsk);
 }
 
 static inline struct cstor_usock *to_cstor_usock(struct cstor_sock *csk)

@@ -58,7 +58,7 @@ enum {
 };
 
 /* SGE context types */
-enum ctxt_type { CTXT_EGRESS, CTXT_INGRESS, CTXT_FLM, CTXT_CNM };
+enum ctxt_type { CTXT_EGRESS, CTXT_INGRESS, CTXT_FLM, CTXT_CNM, CTXT_MAX};
 
 enum { RSP_TYPE_FLBUF, RSP_TYPE_CPL, RSP_TYPE_INTR }; /* response entry types */
 

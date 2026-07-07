@@ -43,16 +43,21 @@ typedef __u32 u32;
 typedef __u64 u64;
 
 #define CSTOR_DEV_NAME_LEN 32
+#define CSTOR_IFACE_NAME_LEN 16
+#define CSTOR_FW_VER_LEN 32
 #define CSTOR_MAX_PORTS 4
+#define CSTOR_INVALID_NUMA_NODE_ID 0xffffffff
+
 #define CSTOR_NVME_TCP_DDP_COLOR_BITS	4
 #define CSTOR_NVME_TCP_NON_DDP_TAG_MASK 0x8000
+
 #define CSTOR_MAX_IMM_PPOD_DATA_LEN	256
 #define CSTOR_MAX_INVALIDATE_ISCSI_TAG 32
 #define CSTOR_ISCSI_MAX_NON_DDP_TAG	((1U << 31) - 1)
 
 struct cstor_device_attr {
-#define CSTOR_FW_VER_LEN 32
 	char name[CSTOR_DEV_NAME_LEN];
+	char iface_name[CSTOR_MAX_PORTS][CSTOR_IFACE_NAME_LEN];
 	char fw_ver[CSTOR_FW_VER_LEN];
 	u64 mac_addr[CSTOR_MAX_PORTS];
 	u64 max_mr_size;
@@ -61,6 +66,7 @@ struct cstor_device_attr {
 	u32 iscsi_page_size_cap;
 	u32 vendor_id;
 	u32 vendor_part_id;
+	u32 numa_node_id;
 	u32 hw_ver;
 	u32 max_qp;
 	u32 max_qp_wr;
@@ -195,7 +201,6 @@ struct cstor_sock {
 	struct sockaddr_storage raddr;
 	u32 tid;
 	u32 atid;
-	u32 rcv_nxt;
 	u16 vlan_id;
 	u8 port_id;
 };
@@ -285,6 +290,7 @@ enum cstor_nvme_tcp_status {
 	CSTOR_NVME_TCP_DDGST_ERR = 25,
 
 	CSTOR_NVME_TCP_LEN_ERR = 33,
+	CSTOR_NVME_TCP_SEQ_MISMATCH_ERR = 34,
 	CSTOR_NVME_TCP_MAX_STATUS
 };
 
@@ -498,7 +504,7 @@ void cstor_release_iscsi_ddp(struct cstor_device *cdev);
 u32 cstor_get_iscsi_ppod_buf_len(struct cstor_qp *qp, u64 first_page_addr, u32 transfer_len);
 int cstor_alloc_iscsi_ddp_tag(struct cstor_iscsi_ddp_tag_info *tinfo, u32 *ddp_tag);
 void cstor_get_iscsi_non_ddp_tag(u32 *tag);
-void cstor_free_iscsi_ddp_tag(struct cstor_qp *qp, u32 ddp_tag);
+int cstor_free_iscsi_ddp_tag(struct cstor_qp *qp, u32 ddp_tag);
 int cstor_invalidate_iscsi_ddp_tag(struct cstor_qp *qp, u32 *tags, u32 num_tag);
 
 int cstor_enable_iscsi_digest(struct cstor_sock *csk, struct cstor_iscsi_digest_attr *attr);

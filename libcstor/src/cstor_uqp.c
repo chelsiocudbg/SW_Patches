@@ -39,8 +39,9 @@
 #include <netinet/ip.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
+
 #include "cstor_umain.h"
-#include "cstor_ioctl.h"
+#include "cstor_uiscsi_ddp.h"
 
 static int __cstor_destroy_qp(struct cstor_udevice *ucdev, u32 qid)
 {
@@ -159,8 +160,8 @@ struct cstor_qp *cstor_create_qp(struct cstor_pd *pd, struct cstor_qp_attr *attr
 
 	cstor_debug(ucdev, CSTOR_LOG, "sqid 0x%x sq key %llu sq db/gts key %llu "
 		    "rqid 0x%x rq key %llu rq db/gts key %llu qid_mask 0x%x\n",
-		    cmd.resp.sqid, cmd.resp.sq_key, cmd.resp.sq_db_gts_key, cmd.resp.rqid,
-		    cmd.resp.rq_key, cmd.resp.rq_db_gts_key, cmd.resp.qid_mask);
+		    cmd.resp.sqid, cmd.resp.sq_key, cmd.resp.sq_db_key, cmd.resp.rqid,
+		    cmd.resp.rq_key, cmd.resp.rq_db_key, cmd.resp.qid_mask);
 
 	uqp->ucdev = ucdev;
 	uqp->usrq = attr->srq ? to_cstor_usrq(attr->srq) : NULL;
@@ -188,12 +189,11 @@ struct cstor_qp *cstor_create_qp(struct cstor_pd *pd, struct cstor_qp_attr *attr
 	cstor_spin_init(&uqp->lock, attr->no_lock);
 
 	dbva = mmap(NULL, cstor_page_size, PROT_WRITE, MAP_SHARED,
-		    ucdev->cdev.dev_fd, cmd.resp.sq_db_gts_key);
+		    ucdev->cdev.dev_fd, cmd.resp.sq_db_key);
 	if (dbva == MAP_FAILED) {
 		ret = errno;
 		cstor_err(ucdev, CSTOR_NOLOG, "mmap() failed, cstor_page_size %llu "
-			  "cmd.resp.sq_db_gts_key %llu\n", cstor_page_size,
-			  cmd.resp.sq_db_gts_key);
+			  "cmd.resp.sq_db_key %llu\n", cstor_page_size, cmd.resp.sq_db_key);
 		goto err3;
 	}
 
@@ -223,12 +223,11 @@ struct cstor_qp *cstor_create_qp(struct cstor_pd *pd, struct cstor_qp_attr *attr
 
 	if (need_rq) {
 		dbva = mmap(NULL, cstor_page_size, PROT_WRITE, MAP_SHARED,
-			    ucdev->cdev.dev_fd, cmd.resp.rq_db_gts_key);
+			    ucdev->cdev.dev_fd, cmd.resp.rq_db_key);
 		if (dbva == MAP_FAILED) {
 			ret = errno;
 			cstor_err(ucdev, CSTOR_NOLOG, "mmap() failed, cstor_page_size %llu "
-				  "cmd.resp.rq_db_gts_key %llu\n",
-				  cstor_page_size, cmd.resp.rq_db_gts_key);
+				  "cmd.resp.rq_db_key %llu\n", cstor_page_size, cmd.resp.rq_db_key);
 			goto err5;
 		}
 
@@ -404,58 +403,47 @@ static int build_immd(void *immdp, struct cstor_send_wr *wr, u32 *plenp, u32 *nu
 
 static int
 build_ulptx_sgl(struct cstor_udevice *ucdev, struct ulptx_sgl *sgl,
-		struct cstor_sge *sg_list, u32 *num_sge)
+		struct cstor_sge *sg_list, u32 *num_dsgl_sge)
 {
-	struct ulptx_sge_pair *to = sgl->sge;
 	struct cstor_sge sge;
 	u64 addr;
 	u32 length;
 	u32 len = 0;
-	u32 i, nsge = *num_sge;
-	/* a sge can be fragmented into max two pages */
-	u32 max_frags = nsge * 2;
-	u32 frags = 0;
 	int ret = 0;
 	u8 idx = 0;
 	bool non_contiguous;
 
-	for (i = 0; i < nsge; i++) {
-		sge = sg_list[i];
-		while (sge.length) {
-			/* return err if the fragments are more than expected */
-			if (unlikely(frags >= max_frags)) {
-				cstor_err(ucdev, CSTOR_NOLOG, "invalid frags %u >= max_frags %u\n",
-					  frags, max_frags);
-				return EINVAL;
-			}
-
-			ret = cstor_virt_to_dma_addr(ucdev, &sge, &addr, &length, &non_contiguous);
-			if (unlikely(ret)) {
-				cstor_err(ucdev, CSTOR_NOLOG, "cstor_virt_to_dma_addr() failed, "
-					  "ret %d\n", ret);
-				return ret;
-			}
-
-			if (!len) {
-				sgl->len0 = htobe32(length);
-				sgl->addr0 = htobe64(addr);
-				frags++;
-			} else {
-				to->len[idx] = htobe32(length);
-				to->addr[idx++] = htobe64(addr);
-				(*num_sge)++;
-				to++;
-				idx %= 2;
-				frags++;
-			}
-
-			sge.addr += length;
-			sge.length -= length;
-			len += length;
+	*num_dsgl_sge = 0;
+	sge = *sg_list;
+	while (sge.length) {
+		if (unlikely(*num_dsgl_sge >= 3)) {
+			cstor_err(ucdev, CSTOR_NOLOG, "invalid num_dsgl_sge %u >= 3\n",
+				  *num_dsgl_sge);
+			return EINVAL;
 		}
+
+		ret = cstor_virt_to_dma_addr(ucdev, &sge, &addr, &length, &non_contiguous);
+		if (unlikely(ret)) {
+			cstor_err(ucdev, CSTOR_NOLOG, "cstor_virt_to_dma_addr() failed, "
+				  "ret %d\n", ret);
+			return ret;
+		}
+
+		if (!len) {
+			sgl->len0 = htobe32(length);
+			sgl->addr0 = htobe64(addr);
+		} else {
+			sgl->sge->len[idx] = htobe32(length);
+			sgl->sge->addr[idx++] = htobe64(addr);
+		}
+
+		(*num_dsgl_sge)++;
+		sge.addr += length;
+		sge.length -= length;
+		len += length;
 	}
 
-	sgl->cmd_nsge = htobe32(V_ULPTX_CMD(ULP_TX_SC_DSGL) | V_ULPTX_NSGE(*num_sge));
+	sgl->cmd_nsge = htobe32(V_ULPTX_CMD(ULP_TX_SC_DSGL) | V_ULPTX_NSGE(*num_dsgl_sge));
 
 	return 0;
 }
@@ -502,7 +490,7 @@ build_tx_data_wr(struct cstor_uqp *uqp, union t4_wr *wqe, struct cstor_send_wr *
 	struct cstor_usock *ucsk = uqp->ucsk;
 	struct fw_v2_nvmet_tx_data_wr *send_wr = &wqe->send_wr;
 	u32 imm_plen = 0, isgl_plen = 0, crc_len = 0;
-	u32 flags;
+	u32 plen, flags;
 	int ret;
 
 	if (wr->sg_list[0].lkey) {
@@ -541,6 +529,13 @@ build_tx_data_wr(struct cstor_uqp *uqp, union t4_wr *wqe, struct cstor_send_wr *
 	send_wr->op_to_immdlen = htobe32(V_FW_WR_OP(FW_V2_NVMET_TX_DATA_WR) |
 					 V_FW_WR_COMPL(is_completion_needed(uqp, wr->flags)) |
 					 V_FW_WR_IMMDLEN(imm_plen));
+
+	if (uqp->recv_bytes >= (256 * 1024 * 1024)) {
+		send_wr->op_to_immdlen |= htobe32(F_FW_V2_NVMET_TX_DATA_WR_DACK_CHANGE |
+						  V_FW_V2_NVMET_TX_DATA_WR_DACK_MODE(3));
+		uqp->recv_bytes = 0;
+	}
+
 	send_wr->flowid_len16 = htobe32(V_FW_WR_FLOWID(ucsk->csk.tid) | V_FW_WR_LEN16(len16));
 	send_wr->r4 = 0;
 	send_wr->r5 = 0;
@@ -570,7 +565,13 @@ build_tx_data_wr(struct cstor_uqp *uqp, union t4_wr *wqe, struct cstor_send_wr *
 	}
 
 	send_wr->flags_hi_to_flags_lo = htobe32(flags);
-	send_wr->plen = htobe32(imm_plen + isgl_plen + crc_len + wr->nvme_tcp.num_pad_bytes);
+
+	plen = imm_plen + isgl_plen + crc_len + wr->nvme_tcp.num_pad_bytes;
+	send_wr->plen = htobe32(plen);
+	send_wr->seqno = htobe32(ucsk->snd_nxt);
+
+	ucsk->snd_nxt += plen;
+
 	return 0;
 }
 
@@ -616,7 +617,7 @@ build_nvmet_tx_data_wr_lso(struct cstor_uqp *uqp, union t4_wr *wqe, struct cstor
 	struct cpl_t7_tx_data_iso *cpl;
 	struct cstor_iso_info iso_info = {};
 	u32 imm_plen = 0, isgl_plen = 0, crc_len = 0;
-	u32 flags, num_pdu;
+	u32 plen, flags, num_pdu;
 	u32 hdr_size;
 	u32 mdsl = 8192;
 	int ret;
@@ -683,8 +684,12 @@ build_nvmet_tx_data_wr_lso(struct cstor_uqp *uqp, union t4_wr *wqe, struct cstor
 	flags |= F_FW_V2_NVMET_TX_DATA_WR_ULPSUBMODE_ISO;
 
 	send_wr->flags_hi_to_flags_lo = htobe32(flags);
-	send_wr->plen = htobe32((hdr_size * num_pdu) + isgl_plen + crc_len +
-				(wr->nvme_tcp.num_pad_bytes * num_pdu));
+
+	plen = (hdr_size * num_pdu) + isgl_plen + crc_len + (wr->nvme_tcp.num_pad_bytes * num_pdu);
+	send_wr->plen = htobe32(plen);
+	send_wr->seqno = htobe32(ucsk->snd_nxt);
+
+	ucsk->snd_nxt += plen;
 
 	iso_info.mpdu = mdsl;
 	iso_info.len = hdr_size + isgl_plen + wr->nvme_tcp.num_pad_bytes;
@@ -935,7 +940,7 @@ int build_recv_wr(union t4_recv_wr *wqe, struct cstor_recv_wr *wr, u16 wr_pidx, 
 	return 0;
 }
 
-static u32 calc_num_imm_sge(struct cstor_send_wr *wr, u16 *imm_dsize)
+static u32 calc_num_imm_sge(struct cstor_send_wr *wr, u32 *imm_dsize)
 {
 	u32 i;
 
@@ -953,10 +958,10 @@ static int
 cstor_calc_wr_len(struct cstor_uqp *uqp, struct cstor_send_wr *wr, void *dsgl, u32 *wr_len)
 {
 	u32 ppod_idx;
+	u32 num_ppods = 0;
+	u32 imm_dsize = 0;
+	u32 num_imm_sge = 0;
 	int ret;
-	u16 num_ppods = 0;
-	u16 imm_dsize = 0;
-	u8 num_imm_sge = 0;
 
 	*wr_len = 0;
 
@@ -1002,6 +1007,12 @@ cstor_calc_wr_len(struct cstor_uqp *uqp, struct cstor_send_wr *wr, void *dsgl, u
 
 		break;
 	case CSTOR_SEND_OP_ISCSI_SETUP_DDP:
+		if (unlikely((wr->num_sge > 1) || (wr->flags & CSTOR_SEND_FLAG_CMPL))) {
+			cstor_err(uqp->ucdev, CSTOR_NOLOG, "invalid wr->num_sge %u > 1 or "
+				  "SEND_FLAG_CMPL is set, wr->flags %#x\n", wr->num_sge, wr->flags);
+			return EINVAL;
+		}
+
 		ppod_idx = (wr->iscsi.ddp_tag >> PPOD_IDX_SHIFT) - uqp->ucdev->iscsi_ppm->base_idx;
 		num_ppods = (uqp->ucdev->iscsi_ppm->ppod_data + ppod_idx)->num_ppods;
 		*wr_len = sizeof(struct fw_nvmet_v2_fr_nsmr_wr);
@@ -1014,17 +1025,17 @@ cstor_calc_wr_len(struct cstor_uqp *uqp, struct cstor_send_wr *wr, void *dsgl, u
 		if (num_ppods <= ULPMEM_IDATA_MAX_PPODS) {
 			*wr_len += (num_ppods << PPOD_SIZE_SHIFT);
 		} else {
-			u32 num_sge = wr->num_sge;
+			u32 num_dsgl_sge;
 
-			ret = build_ulptx_sgl(uqp->ucdev, dsgl, wr->sg_list, &num_sge);
+			ret = build_ulptx_sgl(uqp->ucdev, dsgl, wr->sg_list, &num_dsgl_sge);
 			if (unlikely(ret)) {
 				cstor_err(uqp->ucdev, CSTOR_NOLOG, "build_ulptx_sgl() failed, "
-					  "wr->num_sge %u ret %d\n", wr->num_sge, ret);
+					  "ret %d\n", ret);
 				return ret;
 			}
 
 			*wr_len += sizeof(struct ulptx_sgl) +
-				   ((num_sge - wr->num_sge) * sizeof(struct ulptx_sge_pair));
+				   ((num_dsgl_sge - 1) * sizeof(struct ulptx_sge_pair));
 		}
 		break;
 	case CSTOR_SEND_OP_ISCSI_INVALIDATE_TAG:
@@ -1074,7 +1085,7 @@ int cstor_post_send(struct cstor_qp *qp, struct cstor_send_wr *wr, struct cstor_
 
 	cstor_spin_lock(&uqp->lock);
 	avail = t4_sq_avail(&uqp->wq);
-	if (!avail) {
+	if (unlikely(!avail)) {
 		cstor_spin_unlock(&uqp->lock);
 		*bad_wr = wr;
 		return ENOMEM;
@@ -1114,7 +1125,7 @@ int cstor_post_send(struct cstor_qp *qp, struct cstor_send_wr *wr, struct cstor_
 		len16 = DIV_ROUND_UP(wr_len, 16);
 		ndesc = DIV_ROUND_UP(wr_len, T4_EQ_ENTRY_SIZE);
 
-		if (avail < ndesc) {
+		if (unlikely(avail < ndesc)) {
 			*bad_wr = wr;
 			ret = ENOMEM;
 			break;
@@ -1198,7 +1209,9 @@ int cstor_post_send(struct cstor_qp *qp, struct cstor_send_wr *wr, struct cstor_
 		wr = next_wr;
 	}
 
-	t4_ring_sq_db(&uqp->wq, idx, len16, wqe, ucdev->wc_enabled, ucdev->plat_dev);
+	if (likely(idx))
+		t4_ring_sq_db(&uqp->wq, idx, len16, wqe, ucdev->wc_enabled, ucdev->plat_dev);
+
 	cstor_spin_unlock(&uqp->lock);
 	return ret;
 }
@@ -1254,7 +1267,7 @@ int cstor_post_rq_recv(struct cstor_qp *qp, struct cstor_recv_wr *wr, struct cst
 			break;
 		}
 
-		if (!num_wrs) {
+		if (unlikely(!num_wrs)) {
 			cstor_debug(ucdev, CSTOR_NOLOG,
 				    "No slots! wr_pidx: %u wr_cidx: %u in_use: %u "
 				    "max_wr: %u size: %u\n",
@@ -1291,6 +1304,7 @@ int cstor_post_rq_recv(struct cstor_qp *qp, struct cstor_recv_wr *wr, struct cst
 		}
 
 		uqp->wq.rq.sw_rq[uqp->wq.rq.wr_pidx].ctx = wr->ctx;
+		uqp->wq.rq.sw_rq[uqp->wq.rq.wr_pidx].hdr = (void *)wr->sg_list->addr;
 
 		cstor_debug(ucdev, CSTOR_LOG, "wr->ctx %p pidx %u\n",
 			    wr->ctx, uqp->wq.rq.wr_pidx);
@@ -1317,8 +1331,9 @@ int cstor_post_rq_recv(struct cstor_qp *qp, struct cstor_recv_wr *wr, struct cst
 		wr = wr->next;
 	}
 
-	//if (idx)
-	t4_ring_rq_db(&uqp->wq, idx, len16, wqe, ucdev->plat_dev);
+	if (likely(idx))
+		t4_ring_rq_db(&uqp->wq, idx, len16, wqe, ucdev->plat_dev);
+
 	cstor_spin_unlock(&uqp->lock);
 	return ret;
 }

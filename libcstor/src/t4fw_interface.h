@@ -1064,7 +1064,7 @@ struct fw_flowc_wr {
 	__be32 op_to_nparams;
 	__be32 flowid_len16;
 #ifndef C99_NOT_SUPPORTED
-	struct fw_flowc_mnemval mnemval[0];
+	struct fw_flowc_mnemval mnemval[];
 #endif
 };
 
@@ -1398,7 +1398,7 @@ struct fw_ri_dsgl {
 	__be32	len0;
 	__be64	addr0;
 #ifndef C99_NOT_SUPPORTED
-	struct fw_ri_dsge_pair sge[0];
+	struct fw_ri_dsge_pair sge[];
 #endif
 };
 
@@ -1414,7 +1414,7 @@ struct fw_ri_isgl {
 	__be16	nsge;
 	__be32	r2;
 #ifndef C99_NOT_SUPPORTED
-	struct fw_ri_sge sge[0];
+	struct fw_ri_sge sge[];
 #endif
 };
 
@@ -1424,7 +1424,7 @@ struct fw_ri_immd {
 	__be16	r2;
 	__be32	immdlen;
 #ifndef C99_NOT_SUPPORTED
-	__u8	data[0];
+	__u8	data[];
 #endif
 };
 
@@ -1623,6 +1623,12 @@ enum fw_qp_transport_type {
 	FW_QP_TRANSPORT_TYPE_ISCSI,
 };
 
+/* some bits are free and can be used in future */
+enum fw_rocev2_flags {
+       FW_ROCEV2_IPV4 = 0x0,
+       FW_ROCEV2_IPV6 = 0x1<<0
+};
+
 struct fw_qp_res {
 	union fw_qp_restype {
 		struct fw_qp_res_sqrq {
@@ -1657,7 +1663,7 @@ struct fw_qp_res_wr {
 	__be32 len16_pkd;
 	__u64  cookie;
 #ifndef C99_NOT_SUPPORTED
-	struct fw_qp_res res[0];
+	struct fw_qp_res res[];
 #endif
 };
 
@@ -1940,7 +1946,7 @@ struct fw_ri_res_wr {
 	__be32 len16_pkd;
 	__u64  cookie;
 #ifndef C99_NOT_SUPPORTED
-	struct fw_ri_res res[0];
+	struct fw_ri_res res[];
 #endif
 };
 
@@ -2383,7 +2389,7 @@ struct fw_ri_send_immediate_wr {
 	__be32 r4;
 	__be64 r5;
 #ifndef C99_NOT_SUPPORTED
-	struct fw_ri_immd immd_src[0];
+	struct fw_ri_immd immd_src[];
 #endif
 };
 
@@ -2986,6 +2992,24 @@ struct fw_v2_nvmet_tx_data_wr {
 	} u;
 #endif
 };
+
+#define S_FW_V2_NVMET_TX_DATA_WR_DACK_CHANGE	20
+#define M_FW_V2_NVMET_TX_DATA_WR_DACK_CHANGE	0x1
+#define V_FW_V2_NVMET_TX_DATA_WR_DACK_CHANGE(x)	\
+    ((x) << S_FW_V2_NVMET_TX_DATA_WR_DACK_CHANGE)
+#define G_FW_V2_NVMET_TX_DATA_WR_DACK_CHANGE(x)	\
+    (((x) >> S_FW_V2_NVMET_TX_DATA_WR_DACK_CHANGE) & \
+     M_FW_V2_NVMET_TX_DATA_WR_DACK_CHANGE)
+#define F_FW_V2_NVMET_TX_DATA_WR_DACK_CHANGE	\
+    V_FW_V2_NVMET_TX_DATA_WR_DACK_CHANGE(1U)
+
+#define S_FW_V2_NVMET_TX_DATA_WR_DACK_MODE	18
+#define M_FW_V2_NVMET_TX_DATA_WR_DACK_MODE	0x3
+#define V_FW_V2_NVMET_TX_DATA_WR_DACK_MODE(x)	\
+    ((x) << S_FW_V2_NVMET_TX_DATA_WR_DACK_MODE)
+#define G_FW_V2_NVMET_TX_DATA_WR_DACK_MODE(x)	\
+    (((x) >> S_FW_V2_NVMET_TX_DATA_WR_DACK_MODE) & \
+     M_FW_V2_NVMET_TX_DATA_WR_DACK_MODE)
 
 #define S_FW_V2_NVMET_TX_DATA_WR_FLAGS_HI	10
 #define M_FW_V2_NVMET_TX_DATA_WR_FLAGS_HI	0x3fffff
@@ -5026,6 +5050,16 @@ struct fw_crypto_update_sa_wr {
 	} key;
 };
 
+#define S_FW_CRYPTO_UPDATE_SA_WR_EG_IPVER       3
+#define M_FW_CRYPTO_UPDATE_SA_WR_EG_IPVER       0x1
+#define V_FW_CRYPTO_UPDATE_SA_WR_EG_IPVER(x)    \
+    ((x) << S_FW_CRYPTO_UPDATE_SA_WR_EG_IPVER)
+#define G_FW_CRYPTO_UPDATE_SA_WR_EG_IPVER(x)    \
+    (((x) >> S_FW_CRYPTO_UPDATE_SA_WR_EG_IPVER) & \
+     M_FW_CRYPTO_UPDATE_SA_WR_EG_IPVER)
+#define F_FW_CRYPTO_UPDATE_SA_WR_EG_IPVER       \
+    V_FW_CRYPTO_UPDATE_SA_WR_EG_IPVER(1U)
+
 #define S_FW_CRYPTO_UPDATE_SA_WR_SAOP		2
 #define M_FW_CRYPTO_UPDATE_SA_WR_SAOP		0x1
 #define V_FW_CRYPTO_UPDATE_SA_WR_SAOP(x)	\
@@ -5308,7 +5342,8 @@ enum fw_cmd_opcodes {
 	FW_PTP_CMD                     = 0x3e,
 	FW_HMA_CMD                     = 0x3f,
 	FW_JBOF_WIN_REG_CMD            = 0x40,
-	FW_LASTC2E_CMD                 = 0x41,
+	FW_ACL_VI_CMD                  = 0x41,
+	FW_LASTC2E_CMD                 = 0x42,
 	FW_ERROR_CMD                   = 0x80,
 	FW_DEBUG_CMD                   = 0x81,
 };
@@ -8326,6 +8361,45 @@ struct fw_acl_vlan_cmd {
     (((x) >> S_FW_ACL_VLAN_CMD_FM) & M_FW_ACL_VLAN_CMD_FM)
 #define F_FW_ACL_VLAN_CMD_FM		V_FW_ACL_VLAN_CMD_FM(1U)
 
+struct fw_acl_vi_cmd {
+	__be32 op_to_vfn;
+	__be32 prom_mode_en_to_len16;
+	__be64 r3;
+};
+
+#define S_FW_ACL_VI_CMD_PFN		8
+#define M_FW_ACL_VI_CMD_PFN		0x7
+#define V_FW_ACL_VI_CMD_PFN(x)		((x) << S_FW_ACL_VI_CMD_PFN)
+#define G_FW_ACL_VI_CMD_PFN(x)		\
+    (((x) >> S_FW_ACL_VI_CMD_PFN) & M_FW_ACL_VI_CMD_PFN)
+
+#define S_FW_ACL_VI_CMD_VFN		0
+#define M_FW_ACL_VI_CMD_VFN		0xff
+#define V_FW_ACL_VI_CMD_VFN(x)		((x) << S_FW_ACL_VI_CMD_VFN)
+#define G_FW_ACL_VI_CMD_VFN(x)		\
+    (((x) >> S_FW_ACL_VI_CMD_VFN) & M_FW_ACL_VI_CMD_VFN)
+
+#define S_FW_ACL_VI_CMD_PROM_MODE_EN	31
+#define M_FW_ACL_VI_CMD_PROM_MODE_EN	0x1
+#define V_FW_ACL_VI_CMD_PROM_MODE_EN(x)	((x) << S_FW_ACL_VI_CMD_PROM_MODE_EN)
+#define G_FW_ACL_VI_CMD_PROM_MODE_EN(x)	\
+    (((x) >> S_FW_ACL_VI_CMD_PROM_MODE_EN) & M_FW_ACL_VI_CMD_PROM_MODE_EN)
+#define F_FW_ACL_VI_CMD_PROM_MODE_EN	V_FW_ACL_VI_CMD_PROM_MODE_EN(1U)
+
+#define S_FW_ACL_VI_CMD_MAC_CHANGE	30
+#define M_FW_ACL_VI_CMD_MAC_CHANGE	0x1
+#define V_FW_ACL_VI_CMD_MAC_CHANGE(x)	((x) << S_FW_ACL_VI_CMD_MAC_CHANGE)
+#define G_FW_ACL_VI_CMD_MAC_CHANGE(x)	\
+    (((x) >> S_FW_ACL_VI_CMD_MAC_CHANGE) & M_FW_ACL_VI_CMD_MAC_CHANGE)
+#define F_FW_ACL_VI_CMD_MAC_CHANGE	V_FW_ACL_VI_CMD_MAC_CHANGE(1U)
+
+#define S_FW_ACL_VI_CMD_PMASK		16
+#define M_FW_ACL_VI_CMD_PMASK		0xf
+#define V_FW_ACL_VI_CMD_PMASK(x)	((x) << S_FW_ACL_VI_CMD_PMASK)
+#define G_FW_ACL_VI_CMD_PMASK(x)	\
+    (((x) >> S_FW_ACL_VI_CMD_PMASK) & M_FW_ACL_VI_CMD_PMASK)
+
+
 /* old 16-bit port capabilities bitmap (fw_port_cap16_t) */
 enum fw_port_cap {
 	FW_PORT_CAP_SPEED_100M		= 0x0001,
@@ -8979,18 +9053,18 @@ enum fw_port_type {
 	FW_PORT_TYPE_KX4	=  5,	/* No, 4, No, No, Yes, Yes, 10G */
 	FW_PORT_TYPE_CX4	=  6,	/* No, 4, No, No, No, No, 10G */
 	FW_PORT_TYPE_KX		=  7,	/* No, 1, No, No, Yes, No, 1G */
-	FW_PORT_TYPE_KR		=  8,	/* No, 1, No, No, Yes, Yes, 10G */
+	FW_PORT_TYPE_KR		=  8,	/* No, 1, No, No, Yes, Yes, 10G/1G Backplane, AN */
 	FW_PORT_TYPE_SFP	=  9,	/* No, 1, Yes, No, No, No, 10G */
-	FW_PORT_TYPE_BP_AP	= 10,	/* No, 1, No, No, Yes, Yes, 10G, BP ANGE */
+	FW_PORT_TYPE_BP_AP	= 10,	/* No, 1, No, No, Yes, Yes, 10G/1G, Backplane, AN */
 	FW_PORT_TYPE_BP4_AP	= 11,	/* No, 4, No, No, Yes, Yes, 10G, BP ANGE */
 	FW_PORT_TYPE_QSFP_10G	= 12,	/* No, 1, Yes, No, No, No, 10G */
 	FW_PORT_TYPE_QSA	= 13,	/* No, 1, Yes, No, No, No, 10G */
 	FW_PORT_TYPE_QSFP	= 14,	/* No, 4, Yes, No, No, No, 40G */
-	FW_PORT_TYPE_BP40_BA	= 15,	/* No, 4, No, No, Yes, Yes, 40G/10G/1G, BP ANGE */
-	FW_PORT_TYPE_KR4_100G	= 16,	/* No, 4, 100G/40G/25G, Backplane */
+	FW_PORT_TYPE_BP40_BA	= 15,	/* No, 4, No, No, Yes, Yes, 40G/10G/1G, Backplane, AN */
+	FW_PORT_TYPE_KR4_100G	= 16,	/* No, 4, 100G/40G/50G/25G/10G/1G, Backplane, AN */
 	FW_PORT_TYPE_CR4_QSFP	= 17,	/* No, 4, 100G/40G/25G */
 	FW_PORT_TYPE_CR_QSFP	= 18,	/* No, 1, 25G Spider cable */
-	FW_PORT_TYPE_CR2_QSFP	= 19,	/* No, 2, 50G */
+	FW_PORT_TYPE_CR2_QSFP	= 19,	/* No, 2, 50G, Spider cable  */
 	FW_PORT_TYPE_SFP28	= 20,	/* No, 1, 25G/10G/1G */
 	FW_PORT_TYPE_KR_SFP28	= 21,	/* No, 1, 25G/10G/1G using Backplane */
 	FW_PORT_TYPE_KR_XLAUI	= 22,	/* No, 4, 40G/10G/1G, No AN*/
@@ -9000,20 +9074,35 @@ enum fw_port_type {
     FW_PORT_TYPE_BARE_LINK_200G   = 25,   /* No, 4, 200G/100G/50G */
     FW_PORT_TYPE_SFP56            = 26,   /* No, 1, 50G/25G */
     FW_PORT_TYPE_QSFP56           = 27,   /* No, 4, 200G/100G/50G/25G */
-    FW_PORT_TYPE_QSFP56_4_50G     = 28,   /* No, 1, 50G */
-    FW_PORT_TYPE_KR_50G           = 29,   /* No, 1, 50G */
-    FW_PORT_TYPE_KR2_100G         = 30,   /* No, 2, 100G/50G */
-    FW_PORT_TYPE_KR4_200G         = 31,   /* No, 4, 200G/100G/50G */
-    FW_PORT_TYPE_QSFP56_2_50G     = 32,   /* No, 1, 50G */
+    FW_PORT_TYPE_QSFP56_4_50G     = 28,   /* No, 1, 50G, Spider cable */
+    FW_PORT_TYPE_KR_50G           = 29,   /* No, 1, 50G/25G/10G/1G, Backplane, AN  */
+    FW_PORT_TYPE_KR2_100G         = 30,   /* No, 2, 100G/50G/25G/10G/1G, Backplane, AN */
+    FW_PORT_TYPE_KR4_200G         = 31,   /* No, 4, 200G/100G/40G/50G/25G/10G/1G, Backplane, AN */
+    FW_PORT_TYPE_QSFP56_2_50G     = 32,   /* No, 1, 50G, Spider cable */
     FW_PORT_TYPE_OSFP             = 33,   /* No, 8, 400G/200G/100G/50G */
     FW_PORT_TYPE_QSFPDD	          = 34,   /* No, 8, 400G/200G/100G/50G  */
-    FW_PORT_TYPE_OSFP_2_200G      = 35,   /* No, 4, 200G/100G/50G */
-    FW_PORT_TYPE_QSFP_4_100G      = 36,   /* No, 2, 100G/50G */
-    FW_PORT_TYPE_QSFPDD_2_200G    = 37,   /* No, 4, 200G/100G/50G */
-    FW_PORT_TYPE_KR8_400G         = 38,   /* No, 8, 400G/200G/100G/50G? */
+    FW_PORT_TYPE_OSFP_2_200G      = 35,   /* No, 4, 200G, Spider cable */
+    FW_PORT_TYPE_QSFPDD_2_200G    = 36,   /* No, 4, 200G, Spider cable */
+    FW_PORT_TYPE_KR8_400G         = 37,   /* No, 8, 400G/200G/100G/50G/40G/25G/10G/1G, Backplane, AN */
+    FW_PORT_TYPE_QSFP56_2_100G    = 38,   /* No, 2, 100G, Spider cable */
+    FW_PORT_TYPE_QSFPDD_4_100G    = 39,   /* No, 4, 100G, Spider cable */
+    FW_PORT_TYPE_KR2_50G          = 40,   /* No, 1, 50G/25G/10G/1G, Backplane, AN  */
     FW_PORT_TYPE_MAX,
 	FW_PORT_TYPE_NONE = M_FW_PORT_CMD_PORTTYPE32
 };
+/* List of spider cable types T7 support.
+-------------------------------------------------------------------------------------------------
+|Original Type : Spider Version : V0 Port Type                         : New for T7?            |
+------------------------------------------------------------------------------------------------|
+|100G QSFP28   : 4x25G(NRZ)     : 0x12 (18) FW_PORT_TYPE_CR_QSFP       : Compatible with T6     |
+|100G QSFP28   : 2x50G(NRZ)     : 0x13 (19) FW_PORT_TYPE_CR2_QSFP      : Compatible with T6     |
+|200G QSFP56   : 4x50G          : 0x1C (28) FW_PORT_TYPE_QSFP56_4_50G  : New                    |
+|100G/200G QSFP: 2x50G(NRZ)     : 0x20 (32) FW_PORT_TYPE_QSFP56_2_50G  : New, Compatible with T6|
+|400G QSFP-DD  : 2x200G         : 0x24 (36) FW_PORT_TYPE_QSFPDD_2_200G : New                    |
+|200G QSFP56   : 2x100G         : 0x26 (38) FW_PORT_TYPE_QSFP56_2_100G : New                    |
+|400G QSFP-DD  : 4x100G         : 0x27 (39) FW_PORT_TYPE_QSFPDD_4_100G : New                    |
+-------------------------------------------------------------------------------------------------
+*/
 
 /* These are read from module's EEPROM and determined once the
    module is inserted. */
@@ -9061,7 +9150,7 @@ enum fw_port_link_dn_rc {
 	FW_PORT_LINK_DN_RC_NONE,
 	FW_PORT_LINK_DN_RC_REMFLT,	/* Remote fault detected */
 	FW_PORT_LINK_DN_ANEG_F,		/* Auto-negotiation fault */
-	FW_PORT_LINK_DN_RESERVED3,
+	FW_PORT_LINK_DN_RC_LOCFLT,	/* Local fault detected */
 	FW_PORT_LINK_DN_OVERHEAT,	/* Port overheated */
 	FW_PORT_LINK_DN_UNKNOWN,	/* Unable to determine reason */
 	FW_PORT_LINK_DN_RX_LOS,		/* No RX signal detected */
@@ -10093,8 +10182,9 @@ enum fw_watchdog_actions {
 	FW_WATCHDOG_ACTION_BYPASS = 2,
 	FW_WATCHDOG_ACTION_TMPCHK = 3,
 	FW_WATCHDOG_ACTION_PAUSEOFF = 4,
+	FW_WATCHDOG_ACTION_FWWIREMODE = 5,
 
-	FW_WATCHDOG_ACTION_MAX = 5,
+	FW_WATCHDOG_ACTION_MAX = 6,
 };
 
 #define FW_WATCHDOG_MAX_TIMEOUT_SECS	60

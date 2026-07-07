@@ -40,7 +40,9 @@
 #include <netinet/udp.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+
 #include "cstor_umain.h"
+#include "cstor_uiscsi_ddp.h"
 
 u32 cstor_fls(u32 val)
 {
@@ -62,7 +64,7 @@ static void cstor_put_ddp_idx(struct cstor_ppm *ppm, struct cstor_ppod_data *pda
 	u32 pool_idx = pdata->pool_idx;
 	u32 zone_idx = pdata->zone_idx;
 	u32 i, idx;
-	u8 bits_in_long = sizeof(unsigned long) * 8;
+	u32 bits_in_long = sizeof(unsigned long) * 8;
 
 	if (pdata->is_edram_idx)
 		pool = &ppm->edram_pool[pool_idx];
@@ -78,31 +80,33 @@ static void cstor_put_ddp_idx(struct cstor_ppm *ppm, struct cstor_ppod_data *pda
 	zone->bm->base[i] |= (1UL << idx);
 }
 
-static void cstor_ppm_ppod_release(struct cstor_ppm *ppm, u32 ppod_idx)
+static int cstor_ppm_ppod_release(struct cstor_ppm *ppm, u32 ppod_idx)
 {
 	struct cstor_ppod_data *pdata;
 
-	if (ppod_idx >= ppm->max_ppods) {
+	if (unlikely(ppod_idx >= ppm->max_ppods)) {
 		cstor_err(ppm->ucdev, CSTOR_NOLOG, "ippm: idx too big %u "
 			  "ddr_ppmax: %u edram_ppmax: %u.\n",
 			  ppod_idx, ppm->ddr_ppmax, ppm->edram_ppmax);
-		return;
+		return EINVAL;
 	}
 
 	pdata = ppm->ppod_data + ppod_idx;
-	if (!pdata->num_ppods) {
+	if (unlikely(!pdata->num_ppods)) {
 		cstor_err(ppm->ucdev, CSTOR_NOLOG, "ippm: idx %u, num_ppods 0.\n", ppod_idx);
-		return;
+		return EINVAL;
 	}
 
 	cstor_debug(ppm->ucdev, CSTOR_LOG, "release idx %u, num_ppods %u.\n",
 		    ppod_idx, pdata->num_ppods);
 	cstor_put_ddp_idx(ppm, pdata, ppod_idx);
+
+	return 0;
 }
 
 static int
 cstor_ppod_write_dsgl_ppod(struct cstor_uqp *uqp, union t4_wr *wqe, struct cstor_send_wr *wr,
-			   void *dsgl, u32 ppod_idx, u16 num_ppods, u16 last_pidx, u8 len16)
+			   void *dsgl, u32 ppod_idx, u32 num_ppods, u16 last_pidx, u8 len16)
 {
 	struct fw_nvmet_v2_fr_nsmr_wr *nsmr_wr = &wqe->nsmr_wr;
 
@@ -126,7 +130,7 @@ cstor_ppod_write_dsgl_ppod(struct cstor_uqp *uqp, union t4_wr *wqe, struct cstor
 
 static int
 cstor_ppod_write_imm_ppod(struct cstor_uqp *uqp, union t4_wr *wqe, struct cstor_send_wr *wr,
-			  u32 ppod_idx, u16 num_ppods, u16 last_pidx, u8 len16)
+			  u32 ppod_idx, u32 num_ppods, u16 last_pidx, u8 len16)
 {
 	struct fw_nvmet_v2_fr_nsmr_wr *nsmr_wr = &wqe->nsmr_wr;
 	u32 dlen = num_ppods << PPOD_SIZE_SHIFT;
@@ -181,23 +185,14 @@ build_iscsi_ddp_wr(struct cstor_uqp *uqp, union t4_wr *wqe, struct cstor_send_wr
 {
 	struct cstor_ppm *ppm = uqp->ucdev->iscsi_ppm;
 	u32 ppod_idx = (wr->iscsi.ddp_tag >> PPOD_IDX_SHIFT) - ppm->base_idx;
-	u16 num_ppods = (ppm->ppod_data + ppod_idx)->num_ppods;
-	int ret;
-
-	if (unlikely((wr->num_sge > 1) || (wr->flags & CSTOR_SEND_FLAG_CMPL))) {
-		cstor_err(uqp->ucdev, CSTOR_NOLOG, "invalid wr->num_sge %u > 1 or "
-			  "SEND_FLAG_CMPL is set, wr->flags %#x\n", wr->num_sge, wr->flags);
-		return EINVAL;
-	}
+	u32 num_ppods = (ppm->ppod_data + ppod_idx)->num_ppods;
 
 	if (num_ppods <= ULPMEM_IDATA_MAX_PPODS)
-		ret = cstor_ppod_write_imm_ppod(uqp, wqe, wr, ppod_idx, num_ppods, last_pidx,
-						len16);
+		return cstor_ppod_write_imm_ppod(uqp, wqe, wr, ppod_idx, num_ppods,
+						 last_pidx, len16);
 	else
-		ret = cstor_ppod_write_dsgl_ppod(uqp, wqe, wr, dsgl, ppod_idx, num_ppods, last_pidx,
-						 len16);
-
-	return ret;
+		return cstor_ppod_write_dsgl_ppod(uqp, wqe, wr, dsgl, ppod_idx, num_ppods,
+						  last_pidx, len16);
 }
 
 void cstor_get_iscsi_non_ddp_tag(u32 *tag)
@@ -218,7 +213,7 @@ cstor_ppm_make_ppod_hdr(struct cstor_ppm *ppm, u32 tag, u32 tid, u32 length,
 
 static int
 cstor_make_ppod(struct cstor_iscsi_ddp_tag_info *tinfo, u32 first_page_offset,
-		u32 ddp_tag, u16 num_ppods)
+		u32 ddp_tag, u32 num_ppods)
 {
 	struct cstor_uqp *uqp = to_cstor_uqp(tinfo->qp);
 	struct cstor_pagepod_hdr ppod_hdr = {};
@@ -228,9 +223,9 @@ cstor_make_ppod(struct cstor_iscsi_ddp_tag_info *tinfo, u32 first_page_offset,
 	u32 length;
 	u32 ddp_page_size = uqp->iscsi_ddp_page_size;
 	u32 i, j, len, idx;
-	int ret;
-	u8 num_ppod_dsgl = 0;
+	u32 num_ppod_dsgl = 0;
 	bool non_contiguous;
+	int ret;
 
 	if (num_ppods > ULPMEM_IDATA_MAX_PPODS) {
 		sg = *tinfo->ppod_sge;
@@ -318,7 +313,7 @@ cstor_make_ppod(struct cstor_iscsi_ddp_tag_info *tinfo, u32 first_page_offset,
 }
 
 static void
-cstor_build_ppod_data(struct cstor_ppod_data *pdata, u32 pool_idx, u32 zone_idx, u16 num_ppods,
+cstor_build_ppod_data(struct cstor_ppod_data *pdata, u32 pool_idx, u32 zone_idx, u32 num_ppods,
 		      bool is_edram_idx)
 {
 	pdata->num_ppods = num_ppods;
@@ -335,8 +330,9 @@ cstor_build_ppod_data(struct cstor_ppod_data *pdata, u32 pool_idx, u32 zone_idx,
 static int cstor_get_ddp_idx(struct cstor_ppm_zone *zone)
 {
 	struct cstor_bitmap *bm = zone->bm;
-	int i, idx = -1;
-	u8 bits_in_long = sizeof(unsigned long) * 8;
+	int idx = -1;
+	u32 i;
+	u32 bits_in_long = sizeof(unsigned long) * 8;
 
 	for (i = 0; i < bm->num_long; i++) {
 		idx = ffsl(bm->base[i]);
@@ -353,7 +349,7 @@ static int cstor_get_ddp_idx(struct cstor_ppm_zone *zone)
 	return idx <= 0 ? -1 : ((i * bits_in_long) + (idx - 1));
 }
 
-static int cstor_find_best_fit(u32 *ppod_per_bit, u16 num_ppods, u8 start)
+static int cstor_find_best_fit(u32 *ppod_per_bit, u32 num_ppods, u32 start)
 {
 	int i;
 
@@ -367,7 +363,7 @@ static int cstor_find_best_fit(u32 *ppod_per_bit, u16 num_ppods, u8 start)
 
 static int
 cstor_get_ddp_tag(struct cstor_ppm *ppm, struct cstor_iscsi_ddp_tag_info *tinfo, u32 *ddp_tag,
-		  u16 num_ppods, bool is_edram)
+		  u32 num_ppods, bool is_edram)
 {
 	struct cstor_ppm_pool *pool;
 	struct cstor_ppm_zone *zone;
@@ -375,7 +371,7 @@ cstor_get_ddp_tag(struct cstor_ppm *ppm, struct cstor_iscsi_ddp_tag_info *tinfo,
 	int idx, zone_idx;
 	u32 *ppod_per_bit;
 	u32 hwidx;
-	u8 start;
+	u32 start;
 
 	if (is_edram) {
 		pool = &ppm->edram_pool[tinfo->pool_idx];
@@ -456,20 +452,30 @@ int cstor_alloc_iscsi_ddp_tag(struct cstor_iscsi_ddp_tag_info *tinfo, u32 *ddp_t
 	return 0;
 }
 
-void cstor_free_iscsi_ddp_tag(struct cstor_qp *qp, u32 ddp_tag)
+int cstor_free_iscsi_ddp_tag(struct cstor_qp *qp, u32 ddp_tag)
 {
 	struct cstor_uqp *uqp = to_cstor_uqp(qp);
 	struct cstor_ppm *ppm = uqp->ucdev->iscsi_ppm;
 	u32 ppod_idx;
+	int ret;
 
-	if (ddp_tag & (1U << CSTOR_ISCSI_NON_DDP_BIT))
-		return;
+	if (unlikely(ddp_tag & (1U << CSTOR_ISCSI_NON_DDP_BIT))) {
+		cstor_err(uqp->ucdev, CSTOR_NOLOG, "cstor_free_iscsi_ddp_tag() called "
+			  "on a non ddp tag %u\n", ddp_tag);
+		return EINVAL;
+	}
 
 	ppod_idx = (ddp_tag >> PPOD_IDX_SHIFT) - ppm->base_idx;
-	cstor_ppm_ppod_release(ppm, ppod_idx);
+
+	ret = cstor_ppm_ppod_release(ppm, ppod_idx);
+	if (unlikely(ret))
+		cstor_err(uqp->ucdev, CSTOR_NOLOG, "cstor_ppm_ppod_release() failed, "
+			  "ret %d\n", ret);
+
+	return ret;
 }
 
-static void cstor_ppm_free_cpu_pool(struct cstor_ppm_pool *pool, u32 num_cores)
+static void cstor_ppm_free_cpu_pool(struct cstor_ppm_pool *pool, u32 num_cores, u32 num_zones)
 {
 	u32 i, core;
 
@@ -479,8 +485,10 @@ static void cstor_ppm_free_cpu_pool(struct cstor_ppm_pool *pool, u32 num_cores)
 	}
 
 	for (core = 0; core < num_cores; core++) {
-		for (i = 0; i < pool[core].num_zones; i++)
-			free(pool[core].zones[i].bm);
+		for (i = 0; i < num_zones; i++) {
+			if (pool[core].zones)
+				free(pool[core].zones[i].bm);
+		}
 
 		free(pool[core].zones);
 	}
@@ -491,9 +499,10 @@ static void cstor_ppm_free_cpu_pool(struct cstor_ppm_pool *pool, u32 num_cores)
 static void cstor_ppm_free(struct cstor_ppm *ppm)
 {
 	if (ppm->edram_pool)
-		cstor_ppm_free_cpu_pool(ppm->edram_pool, ppm->num_cores);
+		cstor_ppm_free_cpu_pool(ppm->edram_pool, ppm->num_cores,
+					ppm->ucdev->num_edram_zones);
 
-	cstor_ppm_free_cpu_pool(ppm->ddr_pool, ppm->num_cores);
+	cstor_ppm_free_cpu_pool(ppm->ddr_pool, ppm->num_cores, ppm->ucdev->num_ddr_zones);
 
 	ppm->ucdev->iscsi_ppm = NULL;
 
@@ -539,8 +548,7 @@ static u32 cstor_bitmap_size(u32 bits_in_zone)
 }
 
 static void
-cstor_ppm_get_num_ppod(u32 *zone_num_ppod, u32 *zone_percentage, u32 *ppod_per_bit,
-		       u32 ppmax, u8 num_zones)
+cstor_ppm_get_num_ppod(u32 *zone_num_ppod, u32 *zone_percentage, u32 ppmax, u32 num_zones)
 {
 	u32 count = 0, i;
 
@@ -554,7 +562,7 @@ cstor_ppm_get_num_ppod(u32 *zone_num_ppod, u32 *zone_percentage, u32 *ppod_per_b
 	 * Here the assumption is last zone has the lowest ppod per entry
 	 */
 
-	zone_num_ppod[num_zones - 1] += (ppmax - count) / ppod_per_bit[num_zones - 1];
+	zone_num_ppod[num_zones - 1] += (ppmax - count);
 }
 
 static int
@@ -573,6 +581,12 @@ cstor_ppm_alloc_cpu_pool(struct cstor_udevice *ucdev, struct cstor_ppm_pool **po
 	u32 core, i;
 	int ret;
 
+	if (!ppmax) {
+		cstor_err(ucdev, CSTOR_NOLOG, "ppod per core is 0, total_ppods %u num_cores %u\n",
+			  *total_ppods, num_cores);
+		return EINVAL;
+	}
+
 	if (is_edram) {
 		ppod_per_bit = ucdev->edram_ppod_per_bit;
 		zone_percentage = ucdev->edram_ppod_zone_percentage;
@@ -587,7 +601,7 @@ cstor_ppm_alloc_cpu_pool(struct cstor_udevice *ucdev, struct cstor_ppm_pool **po
 		return ENOMEM;
 	}
 
-	cstor_ppm_get_num_ppod(zone_num_ppod, zone_percentage, ppod_per_bit, ppmax, num_zones);
+	cstor_ppm_get_num_ppod(zone_num_ppod, zone_percentage, ppmax, num_zones);
 
 	for (core = 0; core < num_cores; core++) {
 		p[core].zones = calloc(num_zones, sizeof(struct cstor_ppm_zone));
@@ -619,7 +633,6 @@ cstor_ppm_alloc_cpu_pool(struct cstor_udevice *ucdev, struct cstor_ppm_pool **po
 			zone->ppod_per_bit = ppod_per_bit[i];
 			count += num_of_ppod;
 		}
-		p[core].num_zones = num_zones;
 	}
 
 	*total_ppods = count;
@@ -627,7 +640,7 @@ cstor_ppm_alloc_cpu_pool(struct cstor_udevice *ucdev, struct cstor_ppm_pool **po
 
 	return 0;
 err:
-	cstor_ppm_free_cpu_pool(*pool, num_cores);
+	cstor_ppm_free_cpu_pool(p, num_cores, num_zones);
 	return ret;
 }
 
@@ -719,7 +732,8 @@ static int cstor_ppm_init(struct cstor_udevice *ucdev, u32 num_cores)
 	return 0;
 
 free_edram_pool:
-	cstor_ppm_free_cpu_pool(ppm->edram_pool, num_cores);
+	if (ppm->edram_pool)
+		cstor_ppm_free_cpu_pool(ppm->edram_pool, num_cores, ucdev->num_edram_zones);
 free_ppm:
 	free(ppm);
 	return ret;

@@ -42,7 +42,6 @@
 #include <assert.h>
 
 #include "cstor_umain.h"
-#include "cstor_ioctl.h"
 
 static int __cstor_destroy_srq(struct cstor_udevice *ucdev, u32 srqid)
 {
@@ -88,7 +87,7 @@ struct cstor_srq *cstor_create_srq(struct cstor_pd *pd, struct cstor_srq_attr *a
 
 	cstor_debug(ucdev, CSTOR_LOG, "usrq id %#x usrq key %llu usrq db/gts key %llu "
 		    "qid_mask %#x\n", cmd.resp.srqid, cmd.resp.srq_key,
-		    cmd.resp.srq_db_gts_key, cmd.resp.qid_mask);
+		    cmd.resp.srq_db_key, cmd.resp.qid_mask);
 
 	usrq->srq.pd = pd;
 	usrq->srq.srqid = cmd.resp.srqid;
@@ -98,16 +97,14 @@ struct cstor_srq *cstor_create_srq(struct cstor_pd *pd, struct cstor_srq_attr *a
 	usrq->wq.max_wr = cmd.resp.srq_max_wr;
 	usrq->wq.memsize = cmd.resp.srq_memsize;
 	usrq->wq.rqt_abs_idx = cmd.resp.rqt_abs_idx;
-	usrq->flags = cmd.resp.flags;
 	cstor_spin_init(&usrq->lock, attr->no_lock);
 
 	usrq->wq.udb = mmap(NULL, cstor_page_size, PROT_WRITE, MAP_SHARED,
-			    ucdev->cdev.dev_fd, cmd.resp.srq_db_gts_key);
+			    ucdev->cdev.dev_fd, cmd.resp.srq_db_key);
 	if (usrq->wq.udb == MAP_FAILED) {
 		ret = errno;
 		cstor_err(ucdev, CSTOR_NOLOG, "mmap() failed, cstor_page_size %llu "
-			  "cmd.resp.srq_db_gts_key %llu\n", cstor_page_size,
-			  cmd.resp.srq_db_gts_key);
+			  "cmd.resp.srq_db_key %llu\n", cstor_page_size, cmd.resp.srq_db_key);
 		goto err_destroy_srq;
 	}
 
@@ -251,6 +248,7 @@ cstor_post_srq_recv(struct cstor_srq *srq, struct cstor_recv_wr *wr, struct csto
 		}
 
 		wq->sw_rq[wq->wr_pidx].ctx = wr->ctx;
+		wq->sw_rq[wq->wr_pidx].hdr = (void *)wr->sg_list->addr;
 		wq->sw_rq[wq->wr_pidx].valid = true;
 		cstor_debug(ucdev, CSTOR_LOG,
 			    "wr_cidx %u wr_pidx %u pidx %u in_use %u ctx %p\n",
@@ -274,9 +272,9 @@ cstor_post_srq_recv(struct cstor_srq *srq, struct cstor_recv_wr *wr, struct csto
 		wr = wr->next;
 	}
 
-	if (idx)
+	if (likely(idx))
 		t4_ring_srq_db(wq, idx, len16, wqe, ucdev->plat_dev);
-	cstor_spin_unlock(&usrq->lock);
 
+	cstor_spin_unlock(&usrq->lock);
 	return ret;
 }

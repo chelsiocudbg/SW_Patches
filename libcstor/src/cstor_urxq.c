@@ -37,8 +37,8 @@
 #include <netinet/in.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
+
 #include "cstor_umain.h"
-#include "cstor_ioctl.h"
 
 enum cstor_iscsi_status {
 	/* internal errors */
@@ -65,7 +65,7 @@ enum cstor_iscsi_status {
 
 static const char *cstor_iscsi_status[CSTOR_ISCSI_MAX_STATUS] = {
 	[CSTOR_ISCSI_RX_DATA_ERR] = "rx data err",
-	[CSTOR_ISCSI_TCP_SEQ_MISMATCH_ERR] = "tcp seq mismatch err",
+	[CSTOR_ISCSI_TCP_SEQ_MISMATCH_ERR] = "tcp seq number mismatch err",
 	[CSTOR_ISCSI_PAYLOAD_T10_ERR] = "payload t10 err",
 	[CSTOR_ISCSI_PPOD_MISMATCH_ERR] = "ppod mismatch err",
 	[CSTOR_ISCSI_INVALID_LLIMIT_ERR] = "invalid llimit err",
@@ -181,11 +181,11 @@ struct cstor_rxq *cstor_create_rxq(struct cstor_device *cdev, struct cstor_rxq_a
 		    urxq->fl.qid, urxq->fl.size, urxq->fl.memsize);
 
 	urxq->fl.db = mmap(NULL, cstor_page_size, PROT_WRITE, MAP_SHARED,
-			   cdev->dev_fd, cmd.resp.fl_bar2_key);
+			   cdev->dev_fd, cmd.resp.fl_db_key);
 	if (urxq->fl.db == MAP_FAILED) {
 		ret = errno;
 		cstor_err(ucdev, CSTOR_NOLOG, "mmap() failed, cstor_page_size %llu "
-			  "cmd.resp.fl_bar2_key %llu\n", cstor_page_size, cmd.resp.fl_bar2_key);
+			  "cmd.resp.fl_db_key %llu\n", cstor_page_size, cmd.resp.fl_db_key);
 		goto err5;
 	}
 
@@ -195,11 +195,11 @@ struct cstor_rxq *cstor_create_rxq(struct cstor_device *cdev, struct cstor_rxq_a
 	}
 
 	urxq->iq.gts = mmap(NULL, cstor_page_size, PROT_WRITE, MAP_SHARED,
-			    cdev->dev_fd, cmd.resp.iq_bar2_key);
+			    cdev->dev_fd, cmd.resp.iq_gts_key);
 	if (urxq->iq.gts == MAP_FAILED) {
 		ret = errno;
 		cstor_err(ucdev, CSTOR_NOLOG, "mmap() failed, cstor_page_size %llu "
-			  "cmd.resp.iq_bar2_key %llu\n", cstor_page_size, cmd.resp.iq_bar2_key);
+			  "cmd.resp.iq_gts_key %llu\n", cstor_page_size, cmd.resp.iq_gts_key);
 		goto err6;
 	}
 
@@ -455,13 +455,14 @@ cstor_cpl_rx_iscsi_cmp(struct cstor_usock *ucsk, struct cpl_rx_iscsi_cmp *cpl,
 	wc->seq = be32toh(cpl->seq);
 	wc->ddgst = be32toh(cpl->ulp_crc);
 
-	if (unlikely(ucsk->csk.rcv_nxt != wc->seq)) {
-		cstor_err(ucsk->ucdev, CSTOR_NOLOG, "tcp seq mismatch on tid %u, "
-			  "expected %x received %x\n", ucsk->csk.tid, ucsk->csk.rcv_nxt, wc->seq);
+	if (unlikely(ucsk->rcv_nxt != wc->seq)) {
+		cstor_err(ucsk->ucdev, CSTOR_LOG, "tcp seq number mismatch, tid %u "
+			  "expected %#x received %#x\n", ucsk->csk.tid, ucsk->rcv_nxt, wc->seq);
 		wc->status = (1U << CSTOR_ISCSI_TCP_SEQ_MISMATCH_ERR);
 	}
 
-	ucsk->csk.rcv_nxt += be16toh(cpl->pdu_len_ddp);
+	ucsk->rcv_nxt += be16toh(cpl->pdu_len_ddp);
+	ucsk->uqp->recv_bytes += be16toh(cpl->pdu_len_ddp);
 	cstor_process_ddpvld(wc, be32toh(cpl->ddpvld));
 }
 
@@ -669,7 +670,10 @@ static int cstor_poll_rxq_one(struct cstor_urxq *urxq, struct cstor_iscsi_wc *wc
 		abort();
 	}
 
+	cstor_spin_lock(&ucsk->uqp->lock);
 	ret = cstor_iscsi_rx_handler(ucsk, iqe, fl_buf, wc, pending, opcode);
+	cstor_spin_unlock(&ucsk->uqp->lock);
+
 	t4_iq_consume(iq, ucdev->plat_dev);
 
 	return ret;

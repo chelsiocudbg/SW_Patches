@@ -40,8 +40,8 @@
 #include <util/compiler.h>
 #include <util/udma_barrier.h>
 #include <endian.h>
+
 #include "libcstor.h"
-#include "cstor_umain.h"
 #include "cstor_ioctl.h"
 
 #define ROUND_UP(x, n) (((x) + (n) - 1u) & ~((n) - 1u))
@@ -49,7 +49,6 @@
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 #define IS_POWER_OF_2(x) ((x) && (!((x) & ((x) - 1))))
 
-/* FIXME: Move me to a generic PCI mmio accessor */
 #define cpu_to_pci32(val) htole32(val)
 
 #define writel(v, a) do { *((volatile u32 *)(a)) = cpu_to_pci32(v); } while (0)
@@ -197,6 +196,7 @@ struct t4_sq {
 
 struct t4_swrqe {
 	void *ctx;
+	void *hdr;
 	bool valid;
 };
 
