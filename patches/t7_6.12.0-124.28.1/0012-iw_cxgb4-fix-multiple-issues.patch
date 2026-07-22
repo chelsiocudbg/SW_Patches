@@ -1,0 +1,64 @@
+From 604f5f9f3d6790ee015dc7ceeb2b73f8b6deeae2 Mon Sep 17 00:00:00 2001
+From: Anumula Murali Mohan Reddy <anumula@chelsio.com>
+Date: Wed, 24 Jun 2026 10:52:00 +0530
+Subject: [PATCH 12/12] iw_cxgb4: fix multiple issues
+
+- fix SRQ mapping issue by passing proper addresses.
+- fix MTU for mismatch mtu case.
+- rescan RoCE network addresses after device registration.
+---
+ drivers/infiniband/hw/cxgb4/provider.c |  2 ++
+ drivers/infiniband/hw/cxgb4/qp.c       | 10 ++++++++--
+ 2 files changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/provider.c b/drivers/infiniband/hw/cxgb4/provider.c
+index 47f4cebdb418..547f1a13cc74 100644
+--- a/drivers/infiniband/hw/cxgb4/provider.c
++++ b/drivers/infiniband/hw/cxgb4/provider.c
+@@ -852,6 +852,8 @@ void c4iw_register_device(struct work_struct *work)
+ 				 &dev->rdev.lldi.pdev->dev);
+ 	if (ret)
+ 		goto err_dealloc_ctx;
++	if (roce_mode && (CHELSIO_CHIP_VERSION(dev->rdev.lldi.adapter_type) >= CHELSIO_T7))
++		rdma_roce_rescan_device(&dev->ibdev);
+ 	return;
+ 
+ err_dealloc_ctx:
+diff --git a/drivers/infiniband/hw/cxgb4/qp.c b/drivers/infiniband/hw/cxgb4/qp.c
+index e65237b288ac..74c6f762f52b 100644
+--- a/drivers/infiniband/hw/cxgb4/qp.c
++++ b/drivers/infiniband/hw/cxgb4/qp.c
+@@ -4507,7 +4507,7 @@ static int c4iw_modify_roce_qp(struct c4iw_qp *qhp, int attr_mask,
+ 	}
+ 
+ 	if (attr_mask & ~IB_QP_ATTR_STANDARD_BITS) {
+-		return -EOPNOTSUPP;
++		ret = -EOPNOTSUPP;
+ 		goto out;
+ 	}
+ 	if (attr_mask & IB_QP_PKEY_INDEX) {
+@@ -4525,6 +4525,12 @@ static int c4iw_modify_roce_qp(struct c4iw_qp *qhp, int attr_mask,
+ 	if (attr_mask & IB_QP_PATH_MTU) {
+ 		new_roce_attr.gsi_attr.snd_mss = ib_mtu_enum_to_int(attr->path_mtu);
+ 		pr_debug("snd_mss %u path_mtu %u\n", new_roce_attr.gsi_attr.snd_mss, attr->path_mtu);
++		if (new_roce_attr.gsi_attr.snd_mss > qhp->mtu) {
++			pr_err("invalid mtu (%d) > (%d)\n", new_roce_attr.gsi_attr.snd_mss, qhp->mtu);
++			ret = -EINVAL;
++			goto out;
++		}
++		qhp->mtu = new_roce_attr.gsi_attr.snd_mss;
+ 	}
+ 	if (attr_mask & IB_QP_SQ_PSN) {
+ 		new_roce_attr.gsi_attr.psn_nxt = attr->sq_psn & C4IW_ROCE_PSN_MASK;
+@@ -6266,7 +6272,7 @@ static int create_srq(struct ib_srq *ib_srq, struct ib_srq_init_attr *attrs,
+ 		if (ret)
+ 			goto err_free_srq_db_key_mm;
+ 		srq_key_mm->key = uresp.srq_key;
+-		srq_key_mm->addr = virt_to_phys(srq->wq.queue);
++		srq_key_mm->addr = 0;
+ 		srq_key_mm->len = PAGE_ALIGN(srq->wq.memsize);
+ 		srq_key_mm->vaddr = srq->wq.queue;
+ 		srq_key_mm->dma_addr = srq->wq.dma_addr;
+-- 
+2.39.1
+
