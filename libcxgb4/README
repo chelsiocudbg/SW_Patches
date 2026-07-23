@@ -1,0 +1,35 @@
+Introduction
+============
+
+libcxgb4 is a userspace driver for the Chelsio T4 iWARP RNIC.  It works
+as a plug-in module for libibverbs that allows programs to use Chelsio
+RNICs directly from userspace.  See the libibverbs package for more
+information.
+
+Using libcxgb4
+===================
+
+libcxgb4 will be loaded and used automatically by programs linked with
+libibverbs.  The iw_cxgb4 kernel module must be loaded for Chelsio RNIC
+devices to be detected and used.
+
+Supported Hardware
+==================
+
+libcxgb4 supports the Chelsio T4 family of adapters.
+
+
+Install
+=======
+1. cd libcxgb4
+2. to build;  # ./build.sh
+3. to install; # ./build.sh install
+
+Note:
+1. Make sure you have the prerequisite libraries installed, here are some:
+# yum install cmake gcc libnl3-devel libudev-devel make pkgconfig valgrind-devel ninja-build pandoc
+2. If you have installed libcxgb4 rpm from Uwire package, please uninstall it. following command helps find the rpm # rpm -qa | grep libcxgb4
+3. If you still see some issue, please reinstall rdma-core libraries.
+# yum autoremove -y libibverbs libibumad librdmacm rdma-core-devel iwpmd rdma-core rdma-core-debuginfo rdma
+# yum install libibverbs libibumad librdmacm rdma-core-devel iwpmd rdma-core rdma libibverbs-utils
+ 

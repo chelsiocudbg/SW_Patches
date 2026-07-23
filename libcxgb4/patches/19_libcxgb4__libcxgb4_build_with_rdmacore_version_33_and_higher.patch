@@ -1,0 +1,70 @@
+# HG changeset patch
+# User Dakshaja Uppalapati <dakshaja@chelsio.com>
+# Date 1621944502 -19800
+#      Tue May 25 17:38:22 2021 +0530
+# Node ID 262f8a7d0fefb9bcb1f8460e2fbdcb7a1c6caa73
+# Parent  4b24adce0ad2944f3c3288e942172a724db85550
+libcxgb4: libcxgb4 build with rdmacore version 33 and higher
+
+diff -r 4b24adce0ad2 -r 262f8a7d0fef rdma-core/providers/cxgb4/dev.c
+--- a/rdma-core/providers/cxgb4/dev.c	Tue May 25 17:37:19 2021 +0530
++++ b/rdma-core/providers/cxgb4/dev.c	Tue May 25 17:38:22 2021 +0530
+@@ -123,8 +123,6 @@ static struct verbs_context *chrd_alloc_
+ 	struct ibv_get_context cmd;
+ 	struct chrd_alloc_ucontext_resp resp;
+ 	struct chrd_dev *rhp = to_chrd_dev(ibdev);
+-	struct ibv_query_device qcmd;
+-	uint64_t raw_fw_ver;
+ 	struct ibv_device_attr attr;
+ 
+ 	context = verbs_init_and_alloc_context(ibdev, cmd_fd, context, ibv_ctx,
+diff -r 4b24adce0ad2 -r 262f8a7d0fef rdma-core/providers/cxgb4/libcxgb4.h
+--- a/rdma-core/providers/cxgb4/libcxgb4.h	Tue May 25 17:37:19 2021 +0530
++++ b/rdma-core/providers/cxgb4/libcxgb4.h	Tue May 25 17:38:22 2021 +0530
+@@ -269,7 +269,8 @@ static inline unsigned long_log2(unsigne
+ #endif
+ 
+ int chrd_query_device(struct ibv_context *context,
+-			     struct ibv_device_attr *attr);
++                      const struct ibv_query_device_ex_input *input,
++                      struct ibv_device_attr_ex *attr, size_t attr_size);
+ int chrd_query_port(struct ibv_context *context, uint8_t port,
+ 			   struct ibv_port_attr *attr);
+ 
+diff -r 4b24adce0ad2 -r 262f8a7d0fef rdma-core/providers/cxgb4/verbs.c
+--- a/rdma-core/providers/cxgb4/verbs.c	Tue May 25 17:37:19 2021 +0530
++++ b/rdma-core/providers/cxgb4/verbs.c	Tue May 25 17:38:22 2021 +0530
+@@ -48,24 +48,28 @@
+ 
+ #define MASKED(x) (void *)((unsigned long)(x) & chrd_page_mask)
+ 
+-int chrd_query_device(struct ibv_context *context, struct ibv_device_attr *attr)
++int chrd_query_device(struct ibv_context *context,
++                     const struct ibv_query_device_ex_input *input,
++                     struct ibv_device_attr_ex *attr, size_t attr_size)
+ {
+-	struct ibv_query_device cmd;
++	struct ib_uverbs_ex_query_device_resp resp;
++	size_t resp_size = sizeof(resp);
+ 	uint64_t raw_fw_ver;
+ 	u8 major, minor, sub_minor, build;
+ 	int ret;
+ 
+-	ret = ibv_cmd_query_device(context, attr, &raw_fw_ver, &cmd,
+-				   sizeof cmd);
++	ret = ibv_cmd_query_device_any(context, input, attr, attr_size, &resp,
++                                       &resp_size);
+ 	if (ret)
+ 		return ret;
+ 
++	raw_fw_ver = resp.base.fw_ver;
+ 	major = (raw_fw_ver >> 24) & 0xff;
+ 	minor = (raw_fw_ver >> 16) & 0xff;
+ 	sub_minor = (raw_fw_ver >> 8) & 0xff;
+ 	build = raw_fw_ver & 0xff;
+ 
+-	snprintf(attr->fw_ver, sizeof attr->fw_ver,
++	snprintf(attr->orig_attr.fw_ver, sizeof(attr->orig_attr.fw_ver),
+ 		 "%d.%d.%d.%d", major, minor, sub_minor, build);
+ 
+ 	return 0;

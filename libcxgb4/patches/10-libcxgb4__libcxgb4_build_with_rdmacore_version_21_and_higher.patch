@@ -1,0 +1,12 @@
+diff -r dc04d74e319a rdma-core/providers/cxgb4/dev.c
+--- a/rdma-core/providers/cxgb4/dev.c	Sun Jun 23 17:21:07 2024 -0700
++++ b/rdma-core/providers/cxgb4/dev.c	Sun Jun 23 18:51:56 2024 -0700
+@@ -125,7 +125,7 @@ static struct verbs_context_ops chrd_ctx
+ };
+ 
+ static struct verbs_context *chrd_alloc_context(struct ibv_device *ibdev,
+-					        int cmd_fd)
++					        int cmd_fd, void *private_data)
+ {
+ 	struct chrd_context *context;
+ 	struct ibv_get_context cmd;

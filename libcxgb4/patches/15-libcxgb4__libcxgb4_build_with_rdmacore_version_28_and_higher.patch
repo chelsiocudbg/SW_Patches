@@ -1,0 +1,30 @@
+# HG changeset patch
+# User Potnuri Bharat Teja <bharat@chelsio.com>
+# Date 1584985578 -19800
+#      Mon Mar 23 23:16:18 2020 +0530
+# Node ID af1ca652d80af0bea71ce4c1bbace8423ec9704a
+# Parent  815e247f709bea2457277b1f56c78e66a87f842b
+libcxgb4: libcxgb4 build with rdmacore version 28 and higher
+
+Signed-off-by: Potnuri Bharat Teja <bharat@chelsio.com>
+
+diff -r 815e247f709b -r af1ca652d80a rdma-core/providers/cxgb4/dev.c
+--- a/rdma-core/providers/cxgb4/dev.c	Mon Mar 23 23:06:31 2020 +0530
++++ b/rdma-core/providers/cxgb4/dev.c	Mon Mar 23 23:16:18 2020 +0530
+@@ -46,6 +46,8 @@
+ #include "libcxgb4.h"
+ #include "cxgb4-abi.h"
+ 
++static void chrd_free_context(struct ibv_context *ibctx);
++
+ #define PCI_VENDOR_ID_CHELSIO		0x1425
+ 
+ /*
+@@ -502,7 +505,6 @@ static const struct verbs_device_ops c4i
+ 	.match_device = chrd_device_match,
+ 	.alloc_device = chrd_device_alloc,
+ 	.alloc_context = chrd_alloc_context,
+-	.free_context = chrd_free_context,
+ };
+ PROVIDER_DRIVER(cxgb4, chrd_dev_ops);
+ 

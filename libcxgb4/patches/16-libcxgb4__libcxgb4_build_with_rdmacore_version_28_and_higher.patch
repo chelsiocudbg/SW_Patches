@@ -1,0 +1,12 @@
+diff --git a/rdma-core/providers/cxgb4/dev.c b/rdma-core/providers/cxgb4/dev.c
+index 20494dc7..43420f82 100644
+--- a/rdma-core/providers/cxgb4/dev.c
++++ b/rdma-core/providers/cxgb4/dev.c
+@@ -107,6 +107,7 @@ static struct verbs_context_ops chrd_ctx_common_ops = {
+ 	.req_notify_cq = chrd_arm_cq,
+ 	.async_event = chrd_async_event,
+ 	.post_recv = chrd_post_receive,
++	.free_context = chrd_free_context,
+ };
+
+ static struct verbs_context_ops chrd_ctx_roce_ops = {

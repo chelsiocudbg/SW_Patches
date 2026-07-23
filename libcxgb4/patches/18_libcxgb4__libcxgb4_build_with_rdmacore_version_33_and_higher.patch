@@ -1,0 +1,17 @@
+diff --git a/rdma-core/providers/cxgb4/dev.c b/rdma-core/providers/cxgb4/dev.c
+index 150201be..b061b4ea 100644
+--- a/rdma-core/providers/cxgb4/dev.c
++++ b/rdma-core/providers/cxgb4/dev.c
+@@ -176,8 +176,10 @@ static struct ibv_context *chrd_alloc_context(struct ibv_device *ibdev,
+ 	if (!rhp->mmid2ptr) {
+ 		int ret;
+
+-		ret = ibv_cmd_query_device(&context->ibv_ctx.context, &attr, &raw_fw_ver, &qcmd,
+-					   sizeof qcmd);
++		ret = chrd_query_device(&context->ibv_ctx.context, NULL,
++					container_of(&attr, struct ibv_device_attr_ex,
++						     orig_attr),
++					sizeof(attr));
+ 		if (ret)
+ 			goto err_unmap;
+ 		rhp->max_mr = attr.max_mr;

@@ -1,0 +1,14 @@
+diff --git a/rdma-core/providers/cxgb4/dev.c b/providers/cxgb4/dev.c
+index 1474378d..8f5a9a81 100644
+--- a/rdma-core/providers/cxgb4/dev.c
++++ b/rdma-core/providers/cxgb4/dev.c
+@@ -139,8 +139,7 @@ static struct ibv_context *chrd_alloc_context(struct ibv_device *ibdev,
+ 			goto err_free;
+ 	} 
+
+-	context->ibv_ctx.device = ibdev;
+-	context->ibv_ctx.ops = chrd_ctx_ops;
++	verbs_set_ops(&context->ibv_ctx, &chrd_ctx_common_ops);
+
+ 	switch (rhp->chip_version) {
+ 	case CHELSIO_T6:

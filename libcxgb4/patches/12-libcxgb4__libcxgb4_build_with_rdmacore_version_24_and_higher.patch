@@ -1,0 +1,13 @@
+diff -r dc04d74e319a rdma-core/providers/cxgb4/libcxgb4.h
+--- a/rdma-core/providers/cxgb4/libcxgb4.h	Sun Jun 23 17:21:07 2024 -0700
++++ b/rdma-core/providers/cxgb4/libcxgb4.h	Sun Jun 23 19:02:07 2024 -0700
+@@ -512,7 +512,8 @@ int chrd_attach_mcast(struct ibv_qp *qp,
+ 		      uint16_t lid);
+ int chrd_detach_mcast(struct ibv_qp *qp, const union ibv_gid *gid,
+ 		      uint16_t lid);
+-void chrd_async_event(struct ibv_async_event *event);
++void chrd_async_event(struct ibv_context *context,
++		      struct ibv_async_event *event);
+ void chrd_flush_hw_cq(struct chrd_cq *chp);
+ int chrd_flush_rq(struct chrd_qp *qhp, struct t4_cq *cq, int count);
+ void chrd_flush_sq(struct chrd_qp *qhp);

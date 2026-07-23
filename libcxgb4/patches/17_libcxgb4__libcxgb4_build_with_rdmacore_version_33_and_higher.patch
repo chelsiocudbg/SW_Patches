@@ -1,0 +1,13 @@
+diff --git a/rdma-core/providers/cxgb4/dev.c b/rdma-core/providers/cxgb4/dev.c
+index 7ffdfd0e..6fca867d 100644
+--- a/rdma-core/providers/cxgb4/dev.c
++++ b/rdma-core/providers/cxgb4/dev.c
+@@ -82,7 +82,7 @@ bool is_t5_enable_wc_in_env = false;
+ static LIST_HEAD(devices);
+
+ static struct verbs_context_ops chrd_ctx_common_ops = {
+-	.query_device = chrd_query_device,
++	.query_device_ex = chrd_query_device,
+ 	.query_port = chrd_query_port,
+ 	.alloc_pd = chrd_alloc_pd,
+ 	.dealloc_pd = chrd_free_pd,

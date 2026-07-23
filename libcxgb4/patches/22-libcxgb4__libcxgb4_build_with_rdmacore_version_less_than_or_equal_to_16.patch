@@ -1,0 +1,88 @@
+diff --git a/rdma-core/providers/cxgb4/cq.c b/rdma-core/providers/cxgb4/cq.c
+index 68598ea89566..90627011120f 100644
+--- a/rdma-core/providers/cxgb4/cq.c
++++ b/rdma-core/providers/cxgb4/cq.c
+@@ -937,12 +937,13 @@ static int poll_roce_cq(struct t4_wq *wq, struct t4_cq *cq, struct t4_cqe *cqe,
+ 		        u8 *cqe_flushed, u64 *cookie, u32 *credit,
+ 		        struct t4_srq *srq)
+ {
+-	struct t4_cqe *hw_cqe, read_cqe = {0};
++	struct t4_cqe *hw_cqe, read_cqe;
+ 	struct t4_swsqe *swsqe;
+ 	int ret = 0;
+ 	*cqe_flushed = 0;
+ 	*credit = 0;
+ 
++	memset(&read_cqe, 0, sizeof(read_cqe));
+ 	ret = t4_next_cqe(cq, &hw_cqe);
+ 	if (ret)
+ 		return ret;
+diff --git a/rdma-core/providers/cxgb4/cxgb4-abi.h b/rdma-core/providers/cxgb4/cxgb4-abi.h
+index e481044bf2f3..2b47034926cd 100644
+--- a/rdma-core/providers/cxgb4/cxgb4-abi.h
++++ b/rdma-core/providers/cxgb4/cxgb4-abi.h
+@@ -98,7 +98,7 @@ struct chrd_create_qp_resp {
+ };
+ 
+ struct chrd_create_ah_resp {
+-	struct ib_uverbs_create_ah_resp ibv_resp;
++	struct ibv_create_ah_resp ibv_resp;
+ 	__u32 ah_id;
+ 	__u8 rsvd[4];
+ };
+diff --git a/rdma-core/providers/cxgb4/dev.c b/rdma-core/providers/cxgb4/dev.c
+index 8d9d21af3d76..5f51baca39c4 100644
+--- a/rdma-core/providers/cxgb4/dev.c
++++ b/rdma-core/providers/cxgb4/dev.c
+@@ -85,7 +85,7 @@ bool is_t5_enable_wc_in_env = false;
+ 
+ static LIST_HEAD(devices);
+ 
+-static struct verbs_context_ops chrd_ctx_ops = {
++static struct ibv_context_ops chrd_ctx_ops = {
+ 	.query_device = chrd_query_device,
+ 	.query_port = chrd_query_port,
+ 	.alloc_pd = chrd_alloc_pd,
+@@ -112,19 +112,7 @@ static struct verbs_context_ops chrd_ctx_ops = {
+ 	.post_recv = chrd_post_receive,
+ };
+ 
+-static struct verbs_context_ops chrd_ctx_roce_ops = {
+-		.post_send = chrd_roce_post_send,
+-		.create_ah = chrd_roce_create_ah,
+-		.destroy_ah = chrd_roce_destroy_ah,
+-};
+-
+-static struct verbs_context_ops chrd_ctx_iw_ops = {
+-		.post_send = chrd_iw_post_send,
+-		.create_ah = chrd_iw_create_ah,
+-		.destroy_ah = chrd_iw_destroy_ah,
+-};
+-
+-static struct verbs_context *chrd_alloc_context(struct ibv_device *ibdev,
++static struct ibv_context *chrd_alloc_context(struct ibv_device *ibdev,
+ 					        int cmd_fd)
+ {
+ 	struct chrd_context *context;
+@@ -158,11 +146,16 @@ static struct verbs_context *chrd_alloc_context(struct ibv_device *ibdev,
+ 	context->ibv_ctx.device = ibdev;
+ 	context->ibv_ctx.ops = chrd_ctx_ops;
+ 
+-	if (ibdev->node_type == IBV_NODE_CA)
+-		verbs_set_ops(&context->ibv_ctx, &chrd_ctx_roce_ops);
+-
+-	if (ibdev->node_type == IBV_NODE_RNIC)
+-		verbs_set_ops(&context->ibv_ctx, &chrd_ctx_iw_ops);
++	if (ibdev->node_type == IBV_NODE_CA) {
++		context->ibv_ctx.ops.post_send = chrd_roce_post_send;
++		context->ibv_ctx.ops.create_ah = chrd_roce_create_ah;
++		context->ibv_ctx.ops.destroy_ah = chrd_roce_destroy_ah;
++	}
++	if (ibdev->node_type == IBV_NODE_RNIC) {
++		context->ibv_ctx.ops.post_send = chrd_iw_post_send;
++		context->ibv_ctx.ops.create_ah = chrd_iw_create_ah;
++		context->ibv_ctx.ops.destroy_ah = chrd_iw_destroy_ah;
++	}
+ 
+ 	switch (rhp->chip_version) {
+ 	case CHELSIO_T7:

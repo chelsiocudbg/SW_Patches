@@ -1,0 +1,33 @@
+From 14471c8f13c6b30a402d3d49e43050caf544d699 Mon Sep 17 00:00:00 2001
+From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
+Date: Wed, 22 Jul 2026 16:41:10 +0530
+Subject: [PATCH 13/13] cxgb4: use Struct t4_linux_debugfs_data in
+ mps_trc_show()
+
+seq->private holds t4_linux_debugfs_data struct and not trcidx.
+---
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_debugfs.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_debugfs.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_debugfs.c
+index 75c9c0c56409..eee96c08e72d 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_debugfs.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_debugfs.c
+@@ -1557,10 +1557,11 @@ static const struct file_operations mbox_debugfs_fops = {
+ 
+ static int mps_trc_show(struct seq_file *seq, void *v)
+ {
+-	int enabled, i;
++	struct t4_linux_debugfs_data *d = seq->private;
++	struct adapter *adap = d->adap;
++	unsigned int trcidx = d->data;
+ 	struct trace_params tp;
+-	unsigned int trcidx = (uintptr_t)seq->private & 3;
+-	struct adapter *adap = seq->private - trcidx;
++	int enabled, i;
+ 
+ 	t4_get_trace_filter(adap, &tp, trcidx, &enabled);
+ 	if (!enabled) {
+-- 
+2.39.1
+

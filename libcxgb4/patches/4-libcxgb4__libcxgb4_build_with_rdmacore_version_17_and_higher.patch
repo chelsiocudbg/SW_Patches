@@ -1,0 +1,18 @@
+diff --git a/rdma-core/providers/cxgb4/dev.c b/providers/cxgb4/dev.c
+index 1474378d..cfc14c78 100644
+--- a/rdma-core/providers/cxgb4/dev.c
++++ b/rdma-core/providers/cxgb4/dev.c
+@@ -113,12 +113,10 @@ static struct ibv_context *chrd_alloc_context(struct ibv_device *ibdev,
+ 	uint64_t raw_fw_ver;
+ 	struct ibv_device_attr attr;
+
+-	context = malloc(sizeof *context);
++	context = verbs_init_and_alloc_context(ibdev, cmd_fd, context, ibv_ctx);
+ 	if (!context)
+ 		return NULL;
+
+-	memset(context, 0, sizeof *context);
+-	context->ibv_ctx.cmd_fd = cmd_fd;
+
+ 	resp.status_page_size = 0;
+ 	resp.reserved = 0;

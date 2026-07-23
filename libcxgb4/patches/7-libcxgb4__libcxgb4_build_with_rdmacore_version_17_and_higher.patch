@@ -1,0 +1,20 @@
+diff --git a/rdma-core/providers/cxgb4/dev.c b/rdma-core/providers/cxgb4/dev.c
+index 91755c9f..6b3ef030 100644
+--- a/rdma-core/providers/cxgb4/dev.c
++++ b/rdma-core/providers/cxgb4/dev.c
+@@ -235,6 +235,7 @@ err_free:
+ 		free(rhp->mmid2ptr);
+ 	if (rhp->fid2ptr)
+ 		free(rhp->fid2ptr);
++	verbs_uninit_context(&context->ibv_ctx);
+ 	free(context);
+ 	return NULL;
+ }
+@@ -245,6 +246,7 @@ static void chrd_free_context(struct ibv_context *ibctx)
+
+ 	if (context->status_page_size)
+ 		munmap(context->status_page, context->status_page_size);
++	verbs_uninit_context(&context->ibv_ctx);
+ 	free(context);
+ }
+

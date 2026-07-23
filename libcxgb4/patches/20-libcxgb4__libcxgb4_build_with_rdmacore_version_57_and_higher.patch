@@ -1,0 +1,13 @@
+diff --git a/rdma-core/providers/cxgb4/dev.c b/rdma-core/providers/cxgb4/dev.c
+index 3c94ee66d..3185ddf8b 100644
+--- a/rdma-core/providers/cxgb4/dev.c
++++ b/rdma-core/providers/cxgb4/dev.c
+@@ -137,7 +137,7 @@ static struct verbs_context *chrd_alloc_context(struct ibv_device *ibdev,
+ 
+ 
+ 	if (ibv_cmd_get_context(&context->ibv_ctx, &cmd, sizeof cmd,
+-				&resp.ibv_resp, sizeof resp))
++				NULL, &resp.ibv_resp, sizeof resp))
+ 		goto err_free;
+ 
+ 	context->status_page_size = resp.status_page_size;
