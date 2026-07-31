@@ -1,0 +1,37 @@
+From 7058f5f050f45567201a5e06139de4d1507cdcda Mon Sep 17 00:00:00 2001
+From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
+Date: Thu, 30 Jul 2026 20:30:02 -0400
+Subject: [PATCH 14/14] iw_cxgb4: support for SQD/CLOSING to RESET qp
+ transition
+
+---
+ drivers/infiniband/hw/cxgb4/qp.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/qp.c b/drivers/infiniband/hw/cxgb4/qp.c
+index 74c6f762f52b..73f4f3d59b5c 100644
+--- a/drivers/infiniband/hw/cxgb4/qp.c
++++ b/drivers/infiniband/hw/cxgb4/qp.c
+@@ -4774,15 +4774,16 @@ static int c4iw_modify_roce_qp(struct c4iw_qp *qhp, int attr_mask,
+ 			/*
+ 			 * Allow kernel users to move to ERROR for qp draining.
+ 			 */
+-			if (!internal && (qhp->ibqp.uobject || attrs.next_state !=
+-						C4IW_QP_V2_STATE_ERROR)) {
++			if (!internal && attrs.next_state != C4IW_QP_V2_STATE_RESET &&
++			    (qhp->ibqp.uobject || attrs.next_state != C4IW_QP_V2_STATE_ERROR)) {
+ 				ret = -EINVAL;
+ 				goto out;
+ 			}
+ 			switch (attrs.next_state) {
++				case C4IW_QP_V2_STATE_RESET:
+ 				case C4IW_QP_V2_STATE_IDLE:
+ 					flush_qp(qhp);
+-					set_v2_state(qhp, C4IW_QP_V2_STATE_IDLE);
++					set_v2_state(qhp, attrs.next_state);
+ 					wake_up(&qhp->wait);
+ 					break;
+ 				case C4IW_QP_V2_STATE_ERROR:
+-- 
+2.39.1
+
