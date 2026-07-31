@@ -184,12 +184,15 @@ struct cstor_iscsi_ddp_tag_info {
 	struct cstor_sge *sg_list;
 };
 
+#define CSTOR_INVALID_PORT_ID 0xff
+
 struct cstor_listen_sock {
 	struct cstor_device *cdev;
 	struct cstor_event_channel *event_channel;
 	void *ctx;
 	struct sockaddr_storage laddr;
 	u32 stid;
+	u32 refcnt;
 	u8 port_id;
 };
 
@@ -332,6 +335,7 @@ struct cstor_listen_attr {
 	struct sockaddr_storage laddr;
 	u32 first_pdu_recv_timeout;
 	u8 protocol;
+	u8 port_id;
 };
 
 struct cstor_iscsi_sock_attr {

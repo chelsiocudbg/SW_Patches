@@ -163,9 +163,8 @@ struct cstor_urxq {
 	bool mapped;
 };
 
-#define CSTOR_LCSK_INADDR_ANY_PORT_ID 0xFF
 struct cstor_ulisten_sock {
-	struct cstor_listen_sock lcsk;
+	struct cstor_listen_sock lcsk[CSTOR_MAX_PORTS];
 	struct cstor_udevice *ucdev;
 	u32 refcnt;
 };
@@ -255,7 +254,9 @@ static inline struct cstor_umr *to_cstor_umr(struct cstor_mr *mr)
 
 static inline struct cstor_ulisten_sock *to_cstor_ulisten_sock(struct cstor_listen_sock *lcsk)
 {
-	return container_of(lcsk, struct cstor_ulisten_sock, lcsk);
+	u8 port_id = (lcsk->port_id == CSTOR_INVALID_PORT_ID) ? 0 : lcsk->port_id;
+
+	return container_of(lcsk, struct cstor_ulisten_sock, lcsk[port_id]);
 }
 
 static inline struct cstor_usock *to_cstor_usock(struct cstor_sock *csk)

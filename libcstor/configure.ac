@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([libcstor], [2.0.1], [])
+AC_INIT([libcstor], [2.1.0], [])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR(config)
 AC_CONFIG_HEADERS([config.h])
@@ -10,9 +10,9 @@ AC_CONFIG_SRCDIR([src])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
 AC_PREFIX_DEFAULT([/usr])
 
-AC_SUBST([CURRENT], [2])
-AC_SUBST([REVISION], [1])
-AC_SUBST([AGE], [0])
+AC_SUBST([CURRENT], [3])
+AC_SUBST([REVISION], [0])
+AC_SUBST([AGE], [1])
 
 MYCFLAGS="-Wall -Werror -g -D_GNU_SOURCE -D_BSD_SOURCE -D_DEFAULT_SOURCE"
 AC_ARG_ENABLE(debug, AS_HELP_STRING([--enable-debug], [turns debug output on]), \

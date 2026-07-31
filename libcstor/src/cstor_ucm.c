@@ -54,6 +54,7 @@ cstor_create_listen(struct cstor_device *cdev, struct cstor_listen_attr *attr)
 	struct cstor_ulisten_sock *ulcsk;
 	struct cstor_listen_sock *lcsk;
 	struct cstor_create_listen_cmd cmd = {};
+	bool set_ulcsk = false;
 	int ret = ENODEV;
 
 	if (!cdev) {
@@ -75,12 +76,19 @@ cstor_create_listen(struct cstor_device *cdev, struct cstor_listen_attr *attr)
 
 		cmd.tcp_port = sin->sin_port;
 		cmd.ip_addr[0] = sin->sin_addr.s_addr;
+
+		if (cmd.ip_addr[0] == INADDR_ANY)
+			cmd.inaddr_any = 1;
+
 		cmd.ipv4 = 1;
 	} else if (attr->laddr.ss_family == AF_INET6) {
 		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&attr->laddr;
 
 		cmd.tcp_port = sin6->sin6_port;
 		memcpy(cmd.ip_addr, sin6->sin6_addr.s6_addr, 16);
+
+		if (IN6_IS_ADDR_UNSPECIFIED(cmd.ip_addr))
+			cmd.inaddr_any = 1;
 	} else {
 		cstor_printf(stderr, CSTOR_NOLOG, "invalid ip version\n");
 		errno = EINVAL;
@@ -96,6 +104,23 @@ cstor_create_listen(struct cstor_device *cdev, struct cstor_listen_attr *attr)
 		break;
 	default:
 		cstor_printf(stderr, CSTOR_NOLOG, "invalid protocol %u\n", attr->protocol);
+		errno = EINVAL;
+		return NULL;
+	}
+
+	if (attr->port_id == CSTOR_INVALID_PORT_ID) {
+		if (!cmd.inaddr_any) {
+			cstor_printf(stderr, CSTOR_NOLOG, "invalid port id %u, inaddr_any %u\n",
+				     attr->port_id, cmd.inaddr_any);
+			errno = EINVAL;
+			return NULL;
+		}
+		cmd.port_id = _CSTOR_INVALID_PORT_ID;
+	} else if (attr->port_id < cdev->num_ports) {
+		cmd.port_id = attr->port_id;
+	} else {
+		cstor_printf(stderr, CSTOR_NOLOG, "invalid attr->port_id %u "
+			     "cdev->num_ports %u\n", attr->port_id, cdev->num_ports);
 		errno = EINVAL;
 		return NULL;
 	}
@@ -121,11 +146,21 @@ cstor_create_listen(struct cstor_device *cdev, struct cstor_listen_attr *attr)
 		return NULL;
 	}
 
+	if (get_listen_sock(ucdev, cmd.resp.stid)) {
+		free(ulcsk);
+		ulcsk = get_listen_sock(ucdev, cmd.resp.stid);
+	} else {
+		set_ulcsk = true;
+	}
+
 	ulcsk->refcnt++;
 	ulcsk->ucdev = ucdev;
 
-	lcsk = &ulcsk->lcsk;
-	lcsk->port_id = cmd.resp.port_id;
+	lcsk = (attr->port_id == CSTOR_INVALID_PORT_ID) ? &ulcsk->lcsk[0] :
+		&ulcsk->lcsk[attr->port_id];
+
+	lcsk->refcnt = 1;
+	lcsk->port_id = attr->port_id;
 	lcsk->cdev = &ucdev->cdev;
 	lcsk->ctx = attr->ctx;
 	lcsk->stid = cmd.resp.stid;
@@ -152,7 +187,9 @@ cstor_create_listen(struct cstor_device *cdev, struct cstor_listen_attr *attr)
 			    be16toh(sin6->sin6_port), str);
 	}
 
-	set_listen_sock(ucdev, lcsk->stid, ulcsk);
+	if (set_ulcsk)
+		set_listen_sock(ucdev, lcsk->stid, ulcsk);
+
 	pthread_mutex_unlock(&ucdev->mlock);
 
 	return lcsk;
@@ -163,16 +200,28 @@ static void cstor_put_listen_sock(struct cstor_listen_sock *lcsk)
 	struct cstor_ulisten_sock *ulcsk = to_cstor_ulisten_sock(lcsk);
 	struct cstor_udevice *ucdev = ulcsk->ucdev;
 
+	if (!lcsk->refcnt) {
+		cstor_err(ucdev, CSTOR_NOLOG, "lcsk->refcnt is 0\n");
+		abort();
+	}
+
+	lcsk->refcnt--;
+	cstor_debug(ucdev, CSTOR_NOLOG, "stid %u lcsk->refcnt %u\n", lcsk->stid, lcsk->refcnt);
+
+	if (lcsk->refcnt)
+		return;
+
 	if (!ulcsk->refcnt) {
 		cstor_err(ucdev, CSTOR_NOLOG, "ulcsk->refcnt is 0\n");
 		abort();
 	}
 
 	ulcsk->refcnt--;
-	cstor_debug(ucdev, CSTOR_NOLOG, "stid %u ulcsk->refcnt %u\n",
-		    lcsk->stid, ulcsk->refcnt);
+	cstor_debug(ucdev, CSTOR_NOLOG, "stid %u ulcsk->refcnt %u\n", lcsk->stid, ulcsk->refcnt);
 
-	if (!ulcsk->refcnt) {
+	if (ulcsk->refcnt) {
+		memset(lcsk, 0, sizeof(*lcsk));
+	} else {
 		set_listen_sock(ucdev, lcsk->stid, NULL);
 		free(ulcsk);
 	}
@@ -186,8 +235,10 @@ int cstor_destroy_listen(struct cstor_listen_sock *lcsk)
 	int ret;
 
 	cmd.stid = lcsk->stid;
+	cmd.port_id = (lcsk->port_id == CSTOR_INVALID_PORT_ID) ?
+		       _CSTOR_INVALID_PORT_ID : lcsk->port_id;
 
-	cstor_debug(ucdev, CSTOR_NOLOG, "stid %u\n", cmd.stid);
+	cstor_debug(ucdev, CSTOR_NOLOG, "stid %u port_id %u\n", cmd.stid, cmd.port_id);
 
 	pthread_mutex_lock(&ucdev->mlock);
 	ret = cstor_ioctl(ucdev->cdev.dev_fd, CSTOR_IOCTL_DESTROY_LISTEN, &cmd);
@@ -542,6 +593,7 @@ int
 cstor_process_connect_req_event(struct cstor_udevice *ucdev, struct cstor_uevent *uevt,
 				struct cstor_event *evt)
 {
+	struct cstor_listen_sock *lcsk;
 	struct cstor_sock *csk;
 	struct cstor_ulisten_sock *ulcsk;
 	struct cstor_usock *ucsk;
@@ -566,11 +618,13 @@ cstor_process_connect_req_event(struct cstor_udevice *ucdev, struct cstor_uevent
 		abort();
 	}
 
-	csk->lcsk = &ulcsk->lcsk;
+	lcsk = &ulcsk->lcsk[0];
+	csk->lcsk = (lcsk->port_id == CSTOR_INVALID_PORT_ID) ?
+		     lcsk : &lcsk[req->conn_info.port_id];
 
 	pthread_mutex_lock(&ucdev->mlock);
 	set_sock(ucdev, csk->tid, ucsk);
-	ulcsk->refcnt++;
+	csk->lcsk->refcnt++;
 	pthread_mutex_unlock(&ucdev->mlock);
 
 	cstor_debug(ucdev, CSTOR_NOLOG, "tid %u port id %d vlan_id %u snd_nxt %#x rcv_nxt %#x\n",
