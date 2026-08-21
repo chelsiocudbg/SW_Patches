@@ -1,0 +1,262 @@
+From 5c84b7329e138253236e675b7babc94b68a2f0ac Mon Sep 17 00:00:00 2001
+From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
+Date: Thu, 20 Aug 2026 20:22:24 -0400
+Subject: [PATCH 16/16] iw_cxgb4: Fix WR corruption for RoCE IO
+
+addresses WR corruption due to overwriting.
+---
+ drivers/infiniband/hw/cxgb4/provider.c        |  9 ++--
+ drivers/infiniband/hw/cxgb4/qp.c              | 41 +++++++++++--------
+ drivers/infiniband/hw/cxgb4/t4.h              | 20 ++++++++-
+ .../net/ethernet/chelsio/cxgb4/cxgb4_main.c   |  3 ++
+ 4 files changed, 52 insertions(+), 21 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/provider.c b/drivers/infiniband/hw/cxgb4/provider.c
+index 547f1a13cc74..c20f48f851e3 100644
+--- a/drivers/infiniband/hw/cxgb4/provider.c
++++ b/drivers/infiniband/hw/cxgb4/provider.c
+@@ -437,7 +437,7 @@ static int c4iw_query_device(struct ib_device *ibdev, struct ib_device_attr *pro
+ 
+ 	struct c4iw_dev *dev = to_c4iw_dev(ibdev);
+ 	u32 chip_ver = CHELSIO_CHIP_VERSION(dev->rdev.lldi.adapter_type);
+-
++	u8 roce_prot = roce_mode && (chip_ver >= CHELSIO_T7);
+ 
+ 	pr_debug("ibdev %p\n", ibdev);
+ 
+@@ -460,10 +460,13 @@ static int c4iw_query_device(struct ib_device *ibdev, struct ib_device_attr *pro
+ 	props->max_srq = dev->rdev.lldi.vr->srq.size;
+ 	props->max_qp_wr = dev->rdev.hw_queue.t4_max_qp_depth;
+ 	props->max_srq_wr = dev->rdev.hw_queue.t4_max_qp_depth;
+-	props->max_send_sge = min(T4_MAX_SEND_SGE, T4_MAX_WRITE_SGE);
++	if (roce_prot)
++		props->max_send_sge = min(T4_V2_MAX_SEND_SGE, T4_V2_MAX_WRITE_SGE);
++	else
++		props->max_send_sge = min(T4_MAX_SEND_SGE, T4_MAX_WRITE_SGE);
+ 	props->max_recv_sge = T4_MAX_RECV_SGE;
+ 	props->max_srq_sge = T4_MAX_RECV_SGE;
+-	props->max_sge_rd = (roce_mode && (chip_ver >= CHELSIO_T7)) ? T7_MAX_RD_SGE : 1;
++	props->max_sge_rd = roce_prot ? T7_MAX_RD_SGE : 1;
+ 	props->max_res_rd_atom = dev->rdev.lldi.max_ird_adapter;
+ 	props->max_qp_rd_atom = min(dev->rdev.lldi.max_ordird_qp,
+ 				    c4iw_max_read_depth);
+diff --git a/drivers/infiniband/hw/cxgb4/qp.c b/drivers/infiniband/hw/cxgb4/qp.c
+index 73f4f3d59b5c..fd37b50153a9 100644
+--- a/drivers/infiniband/hw/cxgb4/qp.c
++++ b/drivers/infiniband/hw/cxgb4/qp.c
+@@ -1330,7 +1330,7 @@ static int build_rdma_write(struct t4_sq *sq, union t4_wr *wqe,
+ 	int size;
+ 	int ret;
+ 
+-	if (wr->num_sge > T4_MAX_SEND_SGE)
++	if (wr->num_sge > T4_MAX_WRITE_SGE)
+ 		return -EINVAL;
+ 
+ 	/*
+@@ -1524,10 +1524,12 @@ static int build_memreg(struct t4_sq *sq, union t4_wr *wqe,
+ 			u8 *len16, bool dsgl_supported)
+ {
+ 	struct fw_ri_immd *imdp;
+-	__be64 *p;
+-	int i;
+ 	int pbllen = roundup(mhp->mpl_len * sizeof(u64), 32);
+-	int rem;
++	int max_immd = min(max_fr_immd,
++			   CHELSIO_CHIP_VERSION(mhp->rhp->rdev.lldi.adapter_type) < CHELSIO_T7 ?
++			   T6_ULP_TX_MAX_IMM : T7_ULP_TX_MAX_IMM);
++	int rem, i;
++	__be64 *p;
+ 
+ 	if (mhp->mpl_len > t4_max_fr_depth(&mhp->rhp->rdev, use_dsgl))
+ 		return -EINVAL;
+@@ -1543,7 +1545,7 @@ static int build_memreg(struct t4_sq *sq, union t4_wr *wqe,
+ 	wqe->fr.va_lo_fbo = cpu_to_be32(mhp->ibmr.iova &
+ 					0xffffffff);
+ 
+-	if (dsgl_supported && use_dsgl && (pbllen > max_fr_immd)) {
++	if (dsgl_supported && use_dsgl && (pbllen > max_immd)) {
+ 		struct fw_ri_dsgl *sglp;
+ 
+ 		for (i = 0; i < mhp->mpl_len; i++)
+@@ -1808,7 +1810,7 @@ static int build_v2_ud_rdma_send(struct c4iw_qp *qhp, union t4_wr *wqe,
+ 			wr->send_flags & IB_SEND_INLINE ? "true" : "false",
+ 			wr->send_flags & IB_SEND_SOLICITED ? "true" : "false");
+ 
+-	if (wr->num_sge > T4_MAX_SEND_SGE)
++	if (wr->num_sge > T4_V2_MAX_SEND_SGE)
+ 		return -EINVAL;
+ 
+ 	switch (wr->opcode) {
+@@ -1907,7 +1909,7 @@ static int build_v2_ud_rdma_send(struct c4iw_qp *qhp, union t4_wr *wqe,
+ 	if (wr->num_sge) {
+ 		if (wr->send_flags & IB_SEND_INLINE) {
+ 			ret = build_immd(sq, immd_src, wr,
+-					T4_MAX_SEND_INLINE, &plen);
++					 T4_V2_MAX_SEND_INLINE, &plen);
+ 			if (ret)
+ 				return ret;
+ 			size = sizeof wqe->v2_ud_send + roundup(hdr_len, 16) +
+@@ -1951,7 +1953,7 @@ static int build_v2_rdma_send(struct c4iw_qp *qhp, union t4_wr *wqe,
+ 	int size;
+ 	int ret;
+ 
+-	if (wr->num_sge > T4_MAX_SEND_SGE)
++	if (wr->num_sge > T4_V2_MAX_SEND_SGE)
+ 		return -EINVAL;
+ 	switch (wr->opcode) {
+ 		case IB_WR_SEND:
+@@ -1986,7 +1988,7 @@ static int build_v2_rdma_send(struct c4iw_qp *qhp, union t4_wr *wqe,
+ 	if (wr->num_sge) {
+ 		if (wr->send_flags & IB_SEND_INLINE) {
+ 			ret = build_immd(sq, wqe->v2_send.u.immd_src, wr,
+-					T4_MAX_SEND_INLINE, &plen);
++					T4_V2_MAX_SEND_INLINE, &plen);
+ 			if (ret)
+ 				return ret;
+ 			size = sizeof wqe->v2_send + sizeof(struct fw_ri_immd) +
+@@ -2029,7 +2031,7 @@ static int build_v2_rdma_write(struct c4iw_qp *qhp, union t4_wr *wqe,
+ 	int size;
+ 	int ret;
+ 
+-	if (wr->num_sge > T4_MAX_SEND_SGE)
++	if (wr->num_sge > T4_V2_MAX_WRITE_SGE)
+ 		return -EINVAL;
+ 	if (wr->opcode == IB_WR_RDMA_WRITE_WITH_IMM)
+ 		wqe->v2_write.immd_data = wr->ex.imm_data;
+@@ -2040,7 +2042,7 @@ static int build_v2_rdma_write(struct c4iw_qp *qhp, union t4_wr *wqe,
+ 	if (wr->num_sge) {
+ 		if (wr->send_flags & IB_SEND_INLINE) {
+ 			ret = build_immd(sq, wqe->v2_write.u.immd_src, wr,
+-					T4_MAX_WRITE_INLINE, &plen);
++					T4_V2_MAX_WRITE_INLINE, &plen);
+ 			if (ret)
+ 				return ret;
+ 			size = sizeof wqe->v2_write + sizeof(struct fw_ri_immd) +
+@@ -2126,6 +2128,9 @@ static int build_v2_memreg(struct t4_sq *sq, union t4_wr *wqe,
+ 	__be64 *p;
+ 	int i;
+ 	int pbllen = roundup(mhp->mpl_len * sizeof(u64), 32);
++	int max_immd = min(max_fr_immd,
++			  CHELSIO_CHIP_VERSION(mhp->rhp->rdev.lldi.adapter_type) < CHELSIO_T7 ?
++			  T6_ULP_TX_MAX_IMM : T7_ULP_TX_MAX_IMM);
+ 	int rem;
+ 
+ 	if (mhp->mpl_len > t4_max_fr_depth(&mhp->rhp->rdev, use_dsgl))
+@@ -2144,7 +2149,7 @@ static int build_v2_memreg(struct t4_sq *sq, union t4_wr *wqe,
+ 	wqe->v2_fr.va_lo_fbo = cpu_to_be32(mhp->ibmr.iova &
+ 			0xffffffff);
+ 
+-	if (dsgl_supported && use_dsgl && (pbllen > max_fr_immd)) {
++	if (dsgl_supported && use_dsgl && (pbllen > max_immd)) {
+ 		struct fw_ri_dsgl *sglp;
+ 
+ 		for (i = 0; i < mhp->mpl_len; i++)
+@@ -4966,17 +4971,19 @@ static int c4iw_validate_qp_attrs(struct c4iw_dev *rhp,
+ 		struct ib_qp_init_attr *attrs,
+ 		struct ib_udata *udata)
+ {
+-	if (attrs->cap.max_inline_data > T4_MAX_SEND_INLINE)
+-		return -EINVAL;
+ 
+ 	if (rdma_protocol_roce(&rhp->ibdev, 1)) {
+ 		if (attrs->qp_type != IB_QPT_RC &&
+ 				attrs->qp_type != IB_QPT_UD &&
+ 				attrs->qp_type != IB_QPT_GSI)
+ 			return -EOPNOTSUPP;
++		if (attrs->cap.max_inline_data > T4_V2_MAX_SEND_INLINE)
++			return -EINVAL;
+ 	} else {
+ 		if (attrs->qp_type != IB_QPT_RC)
+ 			return -EOPNOTSUPP;
++		if (attrs->cap.max_inline_data > T4_MAX_SEND_INLINE)
++			return -EINVAL;
+ 	}
+ 
+ 	if (!attrs->srq) {
+@@ -5132,7 +5139,8 @@ static int create_rc_qp(struct ib_qp *qp, struct ib_qp_init_attr *attrs,
+ 
+ 	attrs->cap.max_recv_wr = rqsize - 1;
+ 	attrs->cap.max_send_wr = sqsize - 1;
+-	attrs->cap.max_inline_data = T4_MAX_SEND_INLINE;
++	attrs->cap.max_inline_data = rdma_protocol_roce(&rhp->ibdev, 1) ?
++					T4_V2_MAX_SEND_INLINE : T4_MAX_SEND_INLINE;
+ 
+ 	qhp->rhp = rhp;
+ 	qhp->attr.pd = php->pdid;
+@@ -5910,16 +5918,17 @@ int c4iw_query_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr,
+ 		attr->qp_state = v2_to_ib_qp_state(qhp->attr.state);
+ 		pr_debug("ibqp 0x%llx attr->qp_state %d\n",
+ 				(unsigned long long)ibqp, attr->qp_state);
++		init_attr->cap.max_inline_data = T4_V2_MAX_SEND_INLINE;
+ 	} else {
+ 		attr->qp_state = to_ib_qp_state(qhp->attr.state);
+ 		pr_debug("ibqp 0x%llx attr->qp_state %d\n",
+ 				(unsigned long long)ibqp, attr->qp_state);
++		init_attr->cap.max_inline_data = T4_MAX_SEND_INLINE;
+ 	}
+ 	init_attr->cap.max_send_wr = qhp->attr.sq_num_entries;
+ 	init_attr->cap.max_recv_wr = qhp->attr.rq_num_entries;
+ 	init_attr->cap.max_send_sge = qhp->attr.sq_max_sges;
+ 	init_attr->cap.max_recv_sge = qhp->attr.rq_max_sges;
+-	init_attr->cap.max_inline_data = T4_MAX_SEND_INLINE;
+ 	init_attr->sq_sig_type = qhp->sq_sig_all ? IB_SIGNAL_ALL_WR : 0;
+ 	return 0;
+ }
+diff --git a/drivers/infiniband/hw/cxgb4/t4.h b/drivers/infiniband/hw/cxgb4/t4.h
+index fc48c975c476..37729c8e6902 100644
+--- a/drivers/infiniband/hw/cxgb4/t4.h
++++ b/drivers/infiniband/hw/cxgb4/t4.h
+@@ -61,11 +61,12 @@ struct t4_status_page {
+ 	u16 pad2;
+ 	u32 srqidx;
+ };
+-
++#define T6_ULP_TX_MAX_IMM 256
++#define T7_ULP_TX_MAX_IMM 1024
+ #define T4_RQT_ENTRY_SHIFT 6
+ #define T4_EQ_ENTRY_SIZE 64
+ 
+-#define T4_SQ_NUM_SLOTS 5
++#define T4_SQ_NUM_SLOTS 8
+ #define T4_SQ_NUM_BYTES (T4_EQ_ENTRY_SIZE * T4_SQ_NUM_SLOTS)
+ #define T4_MAX_SEND_SGE ((T4_SQ_NUM_BYTES - sizeof(struct fw_ri_send_wr) - \
+ 			sizeof(struct fw_ri_isgl)) / sizeof(struct fw_ri_sge))
+@@ -79,6 +80,21 @@ struct t4_status_page {
+ 			sizeof(struct fw_ri_isgl)) / sizeof(struct fw_ri_sge))
+ #define T4_MAX_FR_IMMD ((T4_SQ_NUM_BYTES - sizeof(struct fw_ri_fr_nsmr_wr) - \
+ 			sizeof(struct fw_ri_immd)) & ~31UL)
++
++#define T4_V2_MAX_SEND_SGE ((T4_SQ_NUM_BYTES - sizeof(struct fw_ri_v2_send_wr) - \
++                            sizeof(struct fw_ri_isgl)) / sizeof(struct fw_ri_sge))
++#define T4_V2_MAX_SEND_INLINE ((T4_SQ_NUM_BYTES - sizeof(struct fw_ri_v2_send_wr) - \
++                               sizeof(struct fw_ri_immd)))
++#define T4_V2_MAX_WRITE_INLINE ((T4_SQ_NUM_BYTES - \
++                                sizeof(struct fw_ri_v2_rdma_write_wr) - \
++                                sizeof(struct fw_ri_immd)))
++#define T4_V2_MAX_WRITE_SGE ((T4_SQ_NUM_BYTES - \
++                             sizeof(struct fw_ri_v2_rdma_write_wr) - \
++                             sizeof(struct fw_ri_isgl)) / sizeof(struct fw_ri_sge))
++#define T4_V2_MAX_FR_IMMD ((T4_SQ_NUM_BYTES - sizeof(struct fw_ri_v2_fr_nsmr_wr) - \
++                           sizeof(struct fw_ri_immd)) & ~31UL)
++
++
+ #define T4_MAX_FR_IMMD_DEPTH (T4_MAX_FR_IMMD / sizeof(u64))
+ #define T4_MAX_FR_DSGL 1024
+ #define T4_MAX_FR_DSGL_DEPTH (T4_MAX_FR_DSGL / sizeof(u64))
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index 68a0b3a15d91..31e70027951e 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -5615,6 +5615,9 @@ static void print_adapter_info(struct adapter *adapter)
+ 		 cxgb4_msix_enabled(adapter) ? "MSI-X" :
+ 		 (cxgb4_msi_enabled(adapter) ? "MSI" : ""),
+ 		 cxgb4_uld_supported_any(adapter) ? "Offload" : "non-Offload");
++
++	dev_info(adapter->pdev_dev, "Number of cores enabled: %u \n",
++		 adapter->params.num_up_cores);
+ }
+ 
+ static void print_port_info(const struct net_device *dev)
+-- 
+2.39.1
+

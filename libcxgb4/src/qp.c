@@ -279,7 +279,7 @@ static int build_rdma_write(struct t4_sq *sq, union t4_wr *wqe,
 	int size;
 	int ret;
 
-	if (wr->num_sge > T4_MAX_SEND_SGE)
+	if (wr->num_sge > T4_MAX_WRITE_SGE)
 		return -EINVAL;
 	if (wr->opcode == IBV_WR_RDMA_WRITE_WITH_IMM)
 		wqe->write.immd_data = wr->imm_data;
@@ -1502,7 +1502,7 @@ static int build_v2_ud_rdma_send(struct chrd_qp *qhp, union t4_wr *wqe,
 	if (wr->num_sge) {
 		if (wr->send_flags & IBV_SEND_INLINE) {
 			ret = build_immd(sq, immd_src, wr,
-				T4_MAX_SEND_INLINE, &plen);
+					 T4_V2_MAX_SEND_INLINE, &plen);
 			if (ret)
 				return ret;
 			size = sizeof wqe->v2_ud_send + roundup(hdr_len, 16) +
@@ -1544,7 +1544,7 @@ static int build_v2_rdma_send(struct chrd_qp *qhp, union t4_wr *wqe,
 	int size;
 	int ret;
 
-	if (wr->num_sge > T4_MAX_SEND_SGE)
+	if (wr->num_sge > T4_V2_MAX_SEND_SGE)
 		return -EINVAL;
 	switch (wr->opcode) {
 	case IBV_WR_SEND:
@@ -1579,7 +1579,7 @@ static int build_v2_rdma_send(struct chrd_qp *qhp, union t4_wr *wqe,
 	if (wr->num_sge) {
 		if (wr->send_flags & IBV_SEND_INLINE) {
 			ret = build_immd(sq, wqe->v2_send.u.immd_src, wr,
-					 T4_MAX_SEND_INLINE, &plen);
+					 T4_V2_MAX_SEND_INLINE, &plen);
 			if (ret)
 				return ret;
 			size = sizeof wqe->v2_send + sizeof(struct fw_ri_immd) +
@@ -1622,7 +1622,7 @@ static int build_v2_rdma_write(struct chrd_qp *qhp, union t4_wr *wqe,
 	int size;
 	int ret;
 
-	if (wr->num_sge > T4_MAX_SEND_SGE)
+	if (wr->num_sge > T4_V2_MAX_WRITE_SGE)
 		return -EINVAL;
 	if (wr->opcode == IBV_WR_RDMA_WRITE_WITH_IMM)
 		  wqe->v2_write.immd_data = wr->imm_data;
@@ -1633,7 +1633,7 @@ static int build_v2_rdma_write(struct chrd_qp *qhp, union t4_wr *wqe,
 	if (wr->num_sge) {
 		if (wr->send_flags & IBV_SEND_INLINE) {
 			ret = build_immd(sq, wqe->v2_write.u.immd_src, wr,
-					 T4_MAX_WRITE_INLINE, &plen);
+					 T4_V2_MAX_WRITE_INLINE, &plen);
 			if (ret)
 				return ret;
 			size = sizeof(wqe->v2_write) + sizeof(struct fw_ri_immd) +

@@ -128,15 +128,21 @@ struct t4_status_page {
 
 #define T4_EQ_ENTRY_SIZE 64
 
-#define T4_SQ_NUM_SLOTS 5
+#define T4_SQ_NUM_SLOTS 8
 #define T4_SQ_NUM_BYTES (T4_EQ_ENTRY_SIZE * T4_SQ_NUM_SLOTS)
 #define T4_MAX_SEND_SGE ((T4_SQ_NUM_BYTES - sizeof(struct fw_ri_send_wr) - sizeof(struct fw_ri_isgl)) / sizeof (struct fw_ri_sge))
 #define T4_MAX_SEND_INLINE ((T4_SQ_NUM_BYTES - sizeof(struct fw_ri_send_wr) - sizeof(struct fw_ri_immd)))
 #define T4_MAX_WRITE_INLINE ((T4_SQ_NUM_BYTES - sizeof(struct fw_ri_rdma_write_wr) - sizeof(struct fw_ri_immd)))
 #define T4_MAX_WRITE_SGE ((T4_SQ_NUM_BYTES - sizeof(struct fw_ri_rdma_write_wr) - sizeof(struct fw_ri_isgl)) / sizeof (struct fw_ri_sge))
 #define T4_MAX_FR_IMMD ((T4_SQ_NUM_BYTES - sizeof(struct fw_ri_fr_nsmr_wr) - sizeof(struct fw_ri_immd)))
-#define T4_MAX_FR_DEPTH 255
 
+#define T4_V2_MAX_SEND_SGE ((T4_SQ_NUM_BYTES - sizeof(struct fw_ri_v2_send_wr) - sizeof(struct fw_ri_isgl)) / sizeof(struct fw_ri_sge))
+#define T4_V2_MAX_SEND_INLINE ((T4_SQ_NUM_BYTES - sizeof(struct fw_ri_v2_send_wr) - sizeof(struct fw_ri_immd)))
+#define T4_V2_MAX_WRITE_INLINE ((T4_SQ_NUM_BYTES - sizeof(struct fw_ri_v2_rdma_write_wr) - sizeof(struct fw_ri_immd)))
+#define T4_V2_MAX_WRITE_SGE ((T4_SQ_NUM_BYTES - sizeof(struct fw_ri_v2_rdma_write_wr) - sizeof(struct fw_ri_isgl)) / sizeof(struct fw_ri_sge))
+#define T4_V2_MAX_FR_IMMD ((T4_SQ_NUM_BYTES - sizeof(struct fw_ri_v2_fr_nsmr_wr) - sizeof(struct fw_ri_immd)) & ~31UL)
+
+#define T4_MAX_FR_DEPTH 255
 #define T4_RQ_NUM_SLOTS 2
 #define T4_RQ_NUM_BYTES (T4_EQ_ENTRY_SIZE * T4_RQ_NUM_SLOTS)
 #define T4_MAX_RECV_SGE 4
