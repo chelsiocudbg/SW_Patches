@@ -1,0 +1,101 @@
+From c61fae5a0261e48bd6e876a57184ffb67cac7b62 Mon Sep 17 00:00:00 2001
+From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
+Date: Thu, 27 Aug 2026 20:21:56 -0400
+Subject: [PATCH 17/17] iw_cxgb4: Fix UD send WQE write past SQ ring boundary
+
+Since the SQ is circular, the header can cross the end of the ring and
+write past sq->queue[sq->size], corrupting adjacent memory.
+
+For RoCE IPv6 QPs, the per-QP dump line can exceed 180
+bytes/characters, which truncates the debugfs qp dump output, fixes it.
+---
+ drivers/infiniband/hw/cxgb4/device.c |  9 ++++++++-
+ drivers/infiniband/hw/cxgb4/qp.c     | 24 +++++++++++++++++++++++-
+ 2 files changed, 31 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/device.c b/drivers/infiniband/hw/cxgb4/device.c
+index 0eccbc1caf39..1baab8822fbe 100644
+--- a/drivers/infiniband/hw/cxgb4/device.c
++++ b/drivers/infiniband/hw/cxgb4/device.c
+@@ -368,6 +368,13 @@ static int qp_release(struct inode *inode, struct file *file)
+ 	return 0;
+ }
+ 
++/*
++ * Maximum bytes/characters printed per QP entry in the debugfs qp dump.
++ * 224 in worst case scenerio.
++ * Bump this if the per-entry print format grows.
++ */
++#define QP_SIZE 224
++
+ static int qp_open(struct inode *inode, struct file *file)
+ {
+ 	struct c4iw_qp *qp;
+@@ -389,7 +396,7 @@ static int qp_open(struct inode *inode, struct file *file)
+ 	xa_for_each(&qpd->devp->qps, index, qp)
+ 		count++;
+ 
+-	qpd->bufsize = count * 180;
++	qpd->bufsize = count * QP_SIZE;
+ 	qpd->buf = vmalloc(qpd->bufsize);
+ 	if (!qpd->buf) {
+ 		kfree(qpd);
+diff --git a/drivers/infiniband/hw/cxgb4/qp.c b/drivers/infiniband/hw/cxgb4/qp.c
+index fd37b50153a9..c2dc3ce18532 100644
+--- a/drivers/infiniband/hw/cxgb4/qp.c
++++ b/drivers/infiniband/hw/cxgb4/qp.c
+@@ -2866,6 +2866,24 @@ int c4iw_post_receive(struct ib_qp *ibqp, const struct ib_recv_wr *wr,
+ 	return ret;
+ }
+ 
++static void copy_wr_to_sq(struct t4_wq *wq, union t4_wr *wqe, u8 len16)
++{
++	u64 *src, *dst;
++
++	src = (u64 *)wqe;
++	dst = (u64 *)((u8 *)wq->sq.queue + wq->sq.wq_pidx * T4_EQ_ENTRY_SIZE);
++
++	while (len16) {
++		*dst++ = *src++;
++		if (dst == (u64 *)&wq->sq.queue[wq->sq.size])
++			dst = (u64 *)wq->sq.queue;
++		*dst++ = *src++;
++		if (dst == (u64 *)&wq->sq.queue[wq->sq.size])
++			dst = (u64 *)wq->sq.queue;
++		len16--;
++	}
++}
++
+ static int roce_post_send(struct ib_qp *ibqp, const struct ib_send_wr *wr,
+ 		const struct ib_send_wr **bad_wr)
+ {
+@@ -2874,7 +2892,7 @@ static int roce_post_send(struct ib_qp *ibqp, const struct ib_send_wr *wr,
+ 	enum fw_wr_opcodes fw_opcode = 0;
+ 	enum fw_ri_wr_flags fw_flags;
+ 	struct c4iw_qp *qhp;
+-	union t4_wr *wqe = NULL;
++	union t4_wr *wqe = NULL, lwqe;
+ 	u32 num_wrs;
+ 	struct t4_swsqe *swsqe;
+ 	unsigned long flag;
+@@ -2928,6 +2946,8 @@ static int roce_post_send(struct ib_qp *ibqp, const struct ib_send_wr *wr,
+ 				fw_opcode = FW_RI_V2_SEND_WR;
+ 				if (qhp->qp_type == IB_QPT_GSI || qhp->qp_type == IB_QPT_UD) {
+ 					swsqe->opcode = FW_RI_SEND;
++					memset(&lwqe, 0, sizeof(lwqe));
++					wqe = &lwqe;
+ 					err = build_v2_ud_rdma_send(qhp, wqe, wr, &len16);
+ 				} else {
+ 					if (wr->opcode == IB_WR_SEND)
+@@ -3019,6 +3039,8 @@ static int roce_post_send(struct ib_qp *ibqp, const struct ib_send_wr *wr,
+ 		init_wr_hdr(wqe, qhp->wq.sq.pidx, fw_opcode, fw_flags, len16);
+ 		wr = wr->next;
+ 		num_wrs--;
++		if (qhp->qp_type == IB_QPT_GSI || qhp->qp_type == IB_QPT_UD)
++			copy_wr_to_sq(&qhp->wq, wqe, len16);
+ 		t4_sq_produce(&qhp->wq, len16);
+ 		pr_debug("qid %u in_use %u\n", qhp->wq.sq.qid, qhp->wq.sq.in_use);
+ 		idx += DIV_ROUND_UP(len16*16, T4_EQ_ENTRY_SIZE);
+-- 
+2.39.1
+
