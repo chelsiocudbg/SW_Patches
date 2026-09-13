@@ -1,0 +1,82 @@
+From f639e207235f7055be87fc71340c554be0771356 Mon Sep 17 00:00:00 2001
+From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
+Date: Sun, 13 Sep 2026 11:05:19 -0400
+Subject: [PATCH 19/19] iw_cxgb4: add barrier to GTS writes
+
+as observed in certain cases, GTS writes from host are missing at adapter end.
+this patch adds memory barriers to make sure GTS writes reaches the adapter.
+---
+ drivers/infiniband/hw/cxgb4/cq.c |  2 +-
+ drivers/infiniband/hw/cxgb4/t4.h | 14 +++++++++++---
+ 2 files changed, 12 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/cq.c b/drivers/infiniband/hw/cxgb4/cq.c
+index ff56743cde57..26ad9dc309eb 100644
+--- a/drivers/infiniband/hw/cxgb4/cq.c
++++ b/drivers/infiniband/hw/cxgb4/cq.c
+@@ -1007,7 +1007,7 @@ static int poll_roce_cq(struct t4_wq *wq, struct t4_cq *cq, struct t4_cqe *cqe,
+ 
+ 	swsqe = &wq->sq.sw_sq[CQE_WRID_SQ_IDX(hw_cqe)];
+ 	if (!swsqe->signaled) {
+-		pr_err("%s:%d WARNING: UNSIGNALLED COMPLETION @ %u!!\n", __func__, __LINE__, CQE_WRID_SQ_IDX(hw_cqe));
++		pr_err("%s:%d WARNING: UNSIGNALLED COMPLETION @ %u sw_cqe %d cqid %d!!\n", __func__, __LINE__, CQE_WRID_SQ_IDX(hw_cqe), SW_CQE(hw_cqe), cq->cqid);
+ 		ret = -EAGAIN;
+ 		goto skip_cqe;
+ 	}
+diff --git a/drivers/infiniband/hw/cxgb4/t4.h b/drivers/infiniband/hw/cxgb4/t4.h
+index 37729c8e6902..d0aa6ddd4685 100644
+--- a/drivers/infiniband/hw/cxgb4/t4.h
++++ b/drivers/infiniband/hw/cxgb4/t4.h
+@@ -661,8 +661,10 @@ static inline void t4_ring_srq_db(struct t4_srq *srq, u16 inc, u8 len16,
+ 					srq->bar2_va + SGE_UDB_KDOORBELL);
+ 		}
+ 		wmb();
+-	} else
++	} else {
+ 		writel(QID_V(srq->qid) | ARM_PIDX_V(inc) | ARM_QTYPE_V(0), srq->db);
++		wmb();
++	}
+ 	return;
+ }
+ 
+@@ -686,8 +688,10 @@ static inline void t4_ring_sq_db(struct t4_wq *wq, u16 inc, union t4_wr *wqe)
+ 		/* Flush user doorbell area writes. */
+ 		wmb();
+ 	}
+-	else
++	else {
+ 		writel(QID_V(wq->sq.qid) | PIDX_V(inc), wq->db);
++		wmb();
++	}
+ 	return;
+ }
+ 
+@@ -712,8 +716,10 @@ static inline void t4_ring_rq_db(struct t4_wq *wq, u16 inc,
+ 		/* Flush user doorbell area writes. */
+ 		wmb();
+ 	}
+-	else
++	else {
+ 		writel(QID_V(wq->rq.qid) | PIDX_V(inc), wq->db);
++		wmb();
++	}
+ 	return;
+ }
+ 
+@@ -772,11 +778,13 @@ struct t4_cq {
+ 
+ static inline void write_gts(struct t4_cq *cq, u32 val)
+ {
++	wmb();
+ 	if (cq->bar2_va)
+ 		writel(val | INGRESSQID_V(cq->bar2_qid),
+ 		       cq->bar2_va + SGE_UDB_GTS);
+ 	else
+ 		writel(val | INGRESSQID_V(cq->cqid), cq->gts);
++	wmb();
+ }
+ 
+ static inline int t4_clear_cq_armed(struct t4_cq *cq, bool user)
+-- 
+2.39.1
+

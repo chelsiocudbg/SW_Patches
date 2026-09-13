@@ -957,13 +957,14 @@ static int poll_roce_cq(struct t4_wq *wq, struct t4_cq *cq, struct t4_cqe *cqe,
 		        u8 *cqe_flushed, u64 *cookie, u32 *credit,
 		        struct t4_srq *srq)
 {
-	struct t4_cqe *hw_cqe, read_cqe = {0};
+	struct t4_cqe *hw_cqe, read_cqe;
 	struct t4_swsqe *swsqe;
 	int ret = 0;
 	*cqe_flushed = 0;
 	*credit = 0;
 	u8 cqe_opc;
 
+	memset(&read_cqe, 0, sizeof(read_cqe));
 	ret = t4_next_cqe(cq, &hw_cqe);
 	if (ret)
 		return ret;
@@ -1102,7 +1103,7 @@ static int poll_roce_cq(struct t4_wq *wq, struct t4_cq *cq, struct t4_cqe *cqe,
 
 	swsqe = &wq->sq.sw_sq[CQE_WRID_SQ_IDX(hw_cqe)];
 	if (!swsqe->signaled) {
-		printf("%s:%d WARNING: UNSIGNALLED COMPLETION @ %u!!\n", __func__, __LINE__, CQE_WRID_SQ_IDX(hw_cqe));
+		printf("%s:%d WARNING: UNSIGNALLED COMPLETION @%u sw_cqe %d cqid %d!!\n", __func__, __LINE__, CQE_WRID_SQ_IDX(hw_cqe), SW_CQE(hw_cqe), cq->cqid);
 		ret = -EAGAIN;
 		goto skip_cqe;
 	}

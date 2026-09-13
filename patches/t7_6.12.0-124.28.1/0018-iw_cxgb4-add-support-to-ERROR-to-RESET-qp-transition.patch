@@ -1,0 +1,60 @@
+From 9709e631d0cda50490b1f1e168196551928f303b Mon Sep 17 00:00:00 2001
+From: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
+Date: Thu, 10 Sep 2026 21:02:38 -0400
+Subject: [PATCH 18/19] iw_cxgb4: add support to ERROR to RESET qp transition.
+
+NOTE: if the RDMA device is in fatal_error, then ERROR to RESET
+qp transition will fail.
+
+Convert QP states before validating state transitions via
+ib_modify_qp_is_ok().
+
+Signed-off-by: Chelsio Cudbg <chelsiocudbg@users.noreply.github.com>
+---
+ drivers/infiniband/hw/cxgb4/qp.c | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/qp.c b/drivers/infiniband/hw/cxgb4/qp.c
+index c2dc3ce18532..df872aca6a1f 100644
+--- a/drivers/infiniband/hw/cxgb4/qp.c
++++ b/drivers/infiniband/hw/cxgb4/qp.c
+@@ -4499,7 +4499,7 @@ static int c4iw_modify_roce_qp(struct c4iw_qp *qhp, int attr_mask,
+ 			qhp->wq.sq.qid, qhp->wq.rq.qid, mask, qhp->attr.state,
+ 			(mask & C4IW_QP_ATTR_NEXT_STATE) ? attrs.next_state : -1, attr_mask, cur_state,
+ 			new_state);
+-	if (!ib_modify_qp_is_ok(cur_state, new_state,
++	if (!ib_modify_qp_is_ok(v2_to_ib_qp_state(cur_state), v2_to_ib_qp_state(new_state),
+ 				qhp->ibqp.qp_type, attr_mask)) {
+ 		pr_err("%s Invalid modify QP parameters\n", __func__);
+ 		ret = -EINVAL;
+@@ -4699,7 +4699,7 @@ static int c4iw_modify_roce_qp(struct c4iw_qp *qhp, int attr_mask,
+ 	if (qhp->attr.state == attrs.next_state)
+ 		goto out;
+ 
+-	if (!ib_modify_qp_is_ok(cur_state, new_state,
++	if (!ib_modify_qp_is_ok(v2_to_ib_qp_state(cur_state), v2_to_ib_qp_state(new_state),
+ 				qhp->ibqp.qp_type, attr_mask)) {
+ 		pr_err("%s Invalid modify QP parameters\n", __func__);
+ 		ret = -EINVAL;
+@@ -4821,6 +4821,18 @@ static int c4iw_modify_roce_qp(struct c4iw_qp *qhp, int attr_mask,
+ 			}
+ 			break;
+ 		case C4IW_QP_V2_STATE_ERROR:
++			if (attrs.next_state == C4IW_QP_V2_STATE_RESET) {
++				if (c4iw_fatal_error(&rhp->rdev)) {
++					dev_err(rhp->rdev.lldi.dev, "%s - device in fatal error state\n", __func__);
++					ret = -EINVAL;
++					goto out;
++				} else {
++					flush_qp(qhp);
++					set_v2_state(qhp, attrs.next_state);
++					wake_up(&qhp->wait);
++					goto out;
++				}
++			}
+ 			if (attrs.next_state != C4IW_QP_V2_STATE_IDLE) {
+ 				ret = -EINVAL;
+ 				goto out;
+-- 
+2.39.1
+

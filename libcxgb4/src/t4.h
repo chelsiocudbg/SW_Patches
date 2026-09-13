@@ -804,7 +804,9 @@ static inline void t4_ring_sq_db(struct t4_wq *wq, u16 inc, u8 t4, u8 len16,
 		}
 	}
 	/* udb is UC for t4 devices */
+	mmio_wc_start();
 	writel(V_QID(wq->sq.qid & wq->qid_mask) | V_PIDX(inc), wq->sq.udb);
+	mmio_flush_writes();
 }
 
 static inline void t4_ring_rq_db(struct t4_wq *wq, u16 inc, u8 t4, u8 len16,
@@ -1282,12 +1284,16 @@ static inline int t4_arm_cq(struct t4_cq *cq, int se)
 	while (cq->cidx_inc > M_CIDXINC) {
 		val = V_SEINTARM(0) | V_CIDXINC(M_CIDXINC) | V_TIMERREG(7) |
 		      V_INGRESSQID(cq->cqid & cq->qid_mask);
+		mmio_wc_start();
 		writel(val, cq->ugts);
+		mmio_flush_writes();
 		cq->cidx_inc -= M_CIDXINC;
 	}
 	val = V_SEINTARM(se) | V_CIDXINC(cq->cidx_inc) | V_TIMERREG(6) |
 	      V_INGRESSQID(cq->cqid & cq->qid_mask);
+	mmio_wc_start();
 	writel(val, cq->ugts);
+	mmio_flush_writes();
 	cq->cidx_inc = 0;
 	return 0;
 }
@@ -1342,7 +1348,9 @@ static inline void t4_hwcq_consume(struct t4_cq *cq)
 
 		val = V_SEINTARM(0) | V_CIDXINC(cq->cidx_inc) | V_TIMERREG(7) |
 			V_INGRESSQID(cq->cqid & cq->qid_mask);
+		mmio_wc_start();
 		writel(val, cq->ugts);
+		mmio_flush_writes();
 		cq->cidx_inc = 0;
 	}
 	if (++cq->cidx == cq->size) {
