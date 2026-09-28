@@ -1,0 +1,102 @@
+From 4235d49ad21522af691e4f064f911bca8ed66a33 Mon Sep 17 00:00:00 2001
+From: Potnuri Bharat Teja <bharat@chelsio.com>
+Date: Mon, 28 Sep 2026 12:10:39 -0400
+Subject: [PATCH 22/22] iw_cxgb4: update vlan prority for RoCE
+
+updates vlan priority along with vlan for RoCE traffic.
+---
+ drivers/infiniband/hw/cxgb4/cq.c       | 14 +++++++++++---
+ drivers/infiniband/hw/cxgb4/provider.c |  4 +++-
+ drivers/infiniband/hw/cxgb4/qp.c       | 10 +++++++---
+ 3 files changed, 21 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/cq.c b/drivers/infiniband/hw/cxgb4/cq.c
+index 0e5e47571e73..024db7dd34d4 100644
+--- a/drivers/infiniband/hw/cxgb4/cq.c
++++ b/drivers/infiniband/hw/cxgb4/cq.c
+@@ -1174,6 +1174,8 @@ static int c4iw_poll_cq_one(struct c4iw_cq *chp, struct ib_wc *wc,
+ 	u32 cqe2qpid;
+ 	u64 cookie = 0;
+ 	int ret;
++	u16 tci;
++	u16 vid;
+ 	struct c4iw_srq *srq = NULL;
+ 
+ 	ret = t4_next_cqe(&chp->cq, &rd_cqe);
+@@ -1245,9 +1247,15 @@ static int c4iw_poll_cq_one(struct c4iw_cq *chp, struct ib_wc *wc,
+ 						RDMA_NETWORK_IPV4;
+ 					smac = be64_to_cpu(cqe.v2_ext_lo);
+ 					ether_addr_copy(wc->smac, (u8 *)&smac);
+-					wc->vlan_id = CQE_V2_VLAN(&cqe);
+-					if (wc->vlan_id == 0)
+-						wc->vlan_id = 0xffff;
++					tci = CQE_V2_VLAN(&cqe);
++					if (tci == 0 || tci == 0xffff) {
++						vid = 0xffff;
++						wc->sl = 0;
++					} else {
++						vid = tci & VLAN_VID_MASK;
++						wc->sl = (tci & VLAN_PRIO_MASK) >> VLAN_PRIO_SHIFT;
++					}
++					wc->vlan_id = vid;
+ 					wc->wc_flags |= IB_WC_GRH |
+ 						IB_WC_WITH_NETWORK_HDR_TYPE |
+ 						IB_WC_WITH_SMAC|IB_WC_WITH_VLAN;
+diff --git a/drivers/infiniband/hw/cxgb4/provider.c b/drivers/infiniband/hw/cxgb4/provider.c
+index 20ffffa8e97a..3757fa486b39 100644
+--- a/drivers/infiniband/hw/cxgb4/provider.c
++++ b/drivers/infiniband/hw/cxgb4/provider.c
+@@ -116,9 +116,11 @@ static int c4iw_roce_create_ah(struct ib_ah *ah,
+ 
+ 	if (vlan_id < VLAN_N_VID) {
+ 		ahp->insert_vlan_tag = true;
+-		ahp->vlan_id = vlan_id;
++		ahp->vlan_id = vlan_id |
++			((rdma_ah_get_sl(ah_init_attr->ah_attr) & 0x7) << VLAN_PRIO_SHIFT);
+ 	} else {
+ 		ahp->insert_vlan_tag = false;
++		ahp->vlan_id = 0;
+ 	}
+ 	rdma_gid2ip((struct sockaddr *)&ahp->sgid_addr, &sgid_attr->gid);
+ 	rdma_gid2ip((struct sockaddr *)&ahp->dgid_addr, &ah_init_attr->ah_attr->grh.dgid);
+diff --git a/drivers/infiniband/hw/cxgb4/qp.c b/drivers/infiniband/hw/cxgb4/qp.c
+index ad556d4de60a..7d6a3be22493 100644
+--- a/drivers/infiniband/hw/cxgb4/qp.c
++++ b/drivers/infiniband/hw/cxgb4/qp.c
+@@ -1799,8 +1799,10 @@ static int build_v2_ud_rdma_send(struct c4iw_qp *qhp, union t4_wr *wqe,
+ 	if (ret)
+ 		return ret;
+ 
+-	if (vlan_id < VLAN_CFI_MASK)
++	if (vlan_id < VLAN_CFI_MASK) {
+ 		has_vlan = true;
++		vlan_id |= (rdma_ah_get_sl(&ahp->attr) & 0x7) << VLAN_PRIO_SHIFT;
++	}
+ 
+ 	pr_debug("ahp 0x%llx num_sge %u, dest_qp %u, q_key %x, p_key %x, hlen %d, mss %d,"
+ 			" PSN %u, inline %s, solicited %s\n", (unsigned long long)ahp,
+@@ -4130,7 +4132,7 @@ static u64 roce_select_ntuple(struct net_device *dev,
+ 	 * in the Compressed Filter Tuple.
+ 	 */
+ 	if (tp->vlan_shift >= 0 && qhp->roce_attr.roce_ah.vlan_id != CPL_L2T_VLAN_NONE)
+-		ntuple |= (u64)(FT_VLAN_VLD_F | qhp->roce_attr.roce_ah.vlan_id) << tp->vlan_shift;
++		ntuple |= (u64)(FT_VLAN_VLD_F | ahp->vlan_id) << tp->vlan_shift;
+ 
+ 	if (tp->protocol_shift >= 0)
+ 		ntuple |= (u64)IPPROTO_UDP << tp->protocol_shift;
+@@ -4686,9 +4688,11 @@ static int c4iw_modify_roce_qp(struct c4iw_qp *qhp, int attr_mask,
+ 
+ 		if (vlan_id < VLAN_N_VID) {
+ 			new_roce_attr.roce_ah.insert_vlan_tag = true;
+-			new_roce_attr.roce_ah.vlan_id = vlan_id;
++			new_roce_attr.roce_ah.vlan_id = vlan_id |
++					((rdma_ah_get_sl(&attr->ah_attr) & 0x7) << VLAN_PRIO_SHIFT);
+ 		} else {
+ 			new_roce_attr.roce_ah.insert_vlan_tag = false;
++			new_roce_attr.roce_ah.vlan_id = 0;
+ 		}
+ 
+ 		rdma_gid2ip((struct sockaddr *)&ahp->sgid_addr, &sgid_attr->gid);
+-- 
+2.39.1
+
