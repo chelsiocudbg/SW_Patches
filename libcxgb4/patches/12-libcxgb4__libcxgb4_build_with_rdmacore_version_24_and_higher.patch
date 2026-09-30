@@ -8,6 +8,6 @@ diff -r dc04d74e319a rdma-core/providers/cxgb4/libcxgb4.h
 -void chrd_async_event(struct ibv_async_event *event);
 +void chrd_async_event(struct ibv_context *context,
 +		      struct ibv_async_event *event);
- void chrd_flush_hw_cq(struct chrd_cq *chp);
+ void chrd_flush_hw_cq(struct chrd_cq *chp, struct chrd_qp *flush_qhp);
  int chrd_flush_rq(struct chrd_qp *qhp, struct t4_cq *cq, int count);
  void chrd_flush_sq(struct chrd_qp *qhp);

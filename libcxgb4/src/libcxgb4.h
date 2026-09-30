@@ -496,7 +496,8 @@ int chrd_attach_mcast(struct ibv_qp *qp, const union ibv_gid *gid,
 int chrd_detach_mcast(struct ibv_qp *qp, const union ibv_gid *gid,
 		      uint16_t lid);
 void chrd_async_event(struct ibv_async_event *event);
-void chrd_flush_hw_cq(struct chrd_cq *chp);
+void chrd_flush_hw_cq(struct chrd_cq *chp, struct chrd_qp *flush_qhp);
+void chrd_cq_clean(struct chrd_cq *chp, struct chrd_qp *qhp);
 int chrd_flush_rq(struct chrd_qp *qhp, struct t4_cq *cq, int count);
 void chrd_flush_sq(struct chrd_qp *qhp);
 void chrd_count_rcqes(struct t4_cq *cq, struct t4_wq *wq, int *count, enum qp_transport_type prot);

@@ -42,6 +42,7 @@
 #include <string.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <syslog.h>
 
 #include "libcxgb4.h"
 #include "cxgb4-abi.h"
@@ -157,6 +158,10 @@ static struct verbs_context *chrd_alloc_context(struct ibv_device *ibdev,
 
 	context->ibv_ctx.device = ibdev;
 	context->ibv_ctx.ops = chrd_ctx_ops;
+
+	/* bug 302 field debugging: tells us which library the process runs */
+	syslog(LOG_NOTICE, "libcxgb4: bug302 fix level 2 (19834-19839, 19841) "
+	       "opened %s\n", ibdev->name);
 
 	if (ibdev->node_type == IBV_NODE_CA)
 		verbs_set_ops(&context->ibv_ctx, &chrd_ctx_roce_ops);

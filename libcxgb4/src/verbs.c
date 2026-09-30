@@ -1166,12 +1166,55 @@ struct ibv_qp *chrd_create_qp(struct ibv_pd *pd,
 static void reset_qp(struct chrd_qp *qhp)
 {
 	PDBG("%s enter qp %p\n", __func__, qhp);
+	qhp->wq.flushed = 0;
+	qhp->wq.error = 0;
+	/* the kernel cleared this, but a poll may have set it again since */
+	*qhp->wq.qp_errp = 0;
+	qhp->wq.sq.flush_cidx = -1;
 	qhp->wq.sq.cidx = 0;
-	qhp->wq.sq.wq_pidx = qhp->wq.sq.pidx = qhp->wq.sq.in_use = 0;
+	qhp->wq.sq.pidx = qhp->wq.sq.in_use = 0;
 	qhp->wq.rq.cidx = qhp->wq.rq.pidx = qhp->wq.rq.in_use = 0;
+	/*
+	 * An iWARP connection numbers its messages from 1, and poll_iw_cq()
+	 * checks every receive against this.
+	 */
+	qhp->wq.rq.msn = 1;
 	qhp->wq.sq.oldest_read = NULL;
-	memset(qhp->wq.sq.queue, 0, qhp->wq.sq.memsize);
-	memset(qhp->wq.rq.queue, 0, qhp->wq.rq.memsize);
+	/* no stale complete/signaled state for the indices to walk into */
+	memset(qhp->wq.sq.sw_sq, 0, qhp->wq.sq.size * sizeof(*qhp->wq.sq.sw_sq));
+	if (qhp->wq.rq.sw_rq)
+		memset(qhp->wq.rq.sw_rq, 0, qhp->wq.rq.size * sizeof(*qhp->wq.rq.sw_rq));
+	/*
+	 * sq.wq_pidx and rq.wq_pidx index the hardware rings and must stay in
+	 * step with the SGE egress contexts, which keep their CIDX/PIDX across
+	 * FINI and INIT -- only freeing the queue resets them.  Leave them, and
+	 * the rings and status pages they describe, alone.
+	 */
+}
+
+/*
+ * Drop the QP's completions from its CQs, then reset its indices, with no
+ * poll able to run in between.  Locking hierarchy: cq lock first, then qp.
+ */
+static void clean_and_reset_qp(struct chrd_qp *qhp)
+{
+	struct chrd_cq *rchp = to_chrd_cq(qhp->ibv_qp.recv_cq);
+	struct chrd_cq *schp = to_chrd_cq(qhp->ibv_qp.send_cq);
+
+	pthread_spin_lock(&rchp->lock);
+	if (schp != rchp)
+		pthread_spin_lock(&schp->lock);
+	pthread_spin_lock(&qhp->lock);
+
+	chrd_cq_clean(rchp, qhp);
+	if (schp != rchp)
+		chrd_cq_clean(schp, qhp);
+	reset_qp(qhp);
+
+	pthread_spin_unlock(&qhp->lock);
+	if (schp != rchp)
+		pthread_spin_unlock(&schp->lock);
+	pthread_spin_unlock(&rchp->lock);
 }
 
 static int modify_rc_qp(struct ibv_qp *ibqp, struct ibv_qp_attr *attr,
@@ -1179,11 +1222,17 @@ static int modify_rc_qp(struct ibv_qp *ibqp, struct ibv_qp_attr *attr,
 {
 	struct ibv_modify_qp cmd;
 	struct chrd_qp *qhp = to_chrd_qp(ibqp);
+	int to_reset = (attr_mask & IBV_QP_STATE) && attr->qp_state == IBV_QPS_RESET;
 	int ret;
 
 	PDBG("%s enter qp %p new state %d\n", 
 	      __func__, ibqp, attr_mask & IBV_QP_STATE ? attr->qp_state : -1);
-	if (t4_wq_in_error(&qhp->wq))
+	/*
+	 * Flushing turns outstanding work into completions.  A transition to
+	 * RESET discards that work instead, so don't manufacture completions
+	 * that would outlive the reset.
+	 */
+	if (!to_reset && t4_wq_in_error(&qhp->wq))
 		chrd_flush_qp(qhp);
 	pthread_spin_lock(&qhp->lock);
 	ret = ibv_cmd_modify_qp(ibqp, attr, attr_mask, &cmd, sizeof cmd);
@@ -1198,10 +1247,10 @@ static int modify_rc_qp(struct ibv_qp *ibqp, struct ibv_qp_attr *attr,
 	if (attr_mask & IBV_QP_PORT)
 		qhp->roce_attr.port = attr->port_num - 1;
 
-
-	if (!ret && (attr_mask & IBV_QP_STATE) && attr->qp_state == IBV_QPS_RESET)
-		reset_qp(qhp);
 	pthread_spin_unlock(&qhp->lock);
+
+	if (!ret && to_reset)
+		clean_and_reset_qp(qhp);
 	return ret;
 }
 

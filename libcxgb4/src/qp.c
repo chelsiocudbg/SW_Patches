@@ -42,6 +42,7 @@
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <sys/param.h>
+#include <syslog.h>
 #include <infiniband/verbs.h>
 #include <linux/if_ether.h>
 #include "libcxgb4.h"
@@ -714,6 +715,25 @@ static int iw_post_rc_send(struct ibv_qp *ibqp, struct ibv_send_wr *wr,
 
 	qhp = to_chrd_qp(ibqp);
 	pthread_spin_lock(&qhp->lock);
+
+	/*
+	 * The kernel puts the QP in error (the status-page error byte)
+	 * before it sends the FINI, and the library flushes it later, from
+	 * a poll or the next modify.  A WR written into the ring in between
+	 * is never fetched for this connection: the firmware has torn the
+	 * connection down and grants no more credits, so the entry waits in
+	 * the SGE queue and is handed to the firmware after the QP's next
+	 * INIT, as the first WR of the next connection.  Flush now instead,
+	 * so the completions stay in order, then treat the WR as a drain.
+	 */
+	if (!qhp->wq.flushed && t4_wq_in_error(&qhp->wq)) {
+		pthread_spin_unlock(&qhp->lock);
+		/* bug 302 field debugging: once per QP per error, flush clears it */
+		syslog(LOG_NOTICE, "libcxgb4: bug302 qp %u post in error before "
+		       "flush, flushing\n", qhp->wq.sq.qid);
+		chrd_flush_qp(qhp);
+		pthread_spin_lock(&qhp->lock);
+	}
 
 	/*
 	 * If the qp has been flushed, then just insert a special
@@ -1727,6 +1747,27 @@ static int roce_post_rc_send(struct ibv_qp *ibqp, struct ibv_send_wr *wr,
 	pthread_spin_lock(&qhp->lock);
 
 	/*
+	 * The HW/FW connection context is only set up at RTR, so a send
+	 * posted before RTS can't run.  One posted in RESET would also sit
+	 * in the ring until the QP is taken to its next connection.
+	 */
+	if (ibqp->state < IBV_QPS_RTS) {
+		pthread_spin_unlock(&qhp->lock);
+		*bad_wr = wr;
+		return EINVAL;
+	}
+
+	/* in error but not yet flushed: flush first, see iw_post_rc_send() */
+	if (!qhp->wq.flushed && t4_wq_in_error(&qhp->wq)) {
+		pthread_spin_unlock(&qhp->lock);
+		/* bug 302 field debugging: once per QP per error, flush clears it */
+		syslog(LOG_NOTICE, "libcxgb4: bug302 qp %u post in error before "
+		       "flush, flushing\n", qhp->wq.sq.qid);
+		chrd_flush_qp(qhp);
+		pthread_spin_lock(&qhp->lock);
+	}
+
+	/*
 	 * If the qp has been flushed, then just insert a special
 	 * drain cqe.
 	 */
@@ -1888,6 +1929,31 @@ static int post_rc_recv(struct ibv_qp *ibqp, struct ibv_recv_wr *wr,
 
 	qhp = to_chrd_qp(ibqp);
 	pthread_spin_lock(&qhp->lock);
+
+	/*
+	 * Receives may be posted from INIT on, ahead of the connection.  In
+	 * RESET they would sit in the ring until the QP is taken to its next
+	 * connection.  RoCE only: an iWARP QP's ibv_qp.state is not kept up to
+	 * date, because the CM moves the QP in the kernel, and a QP handed to
+	 * rdma_connect()/rdma_accept() by number may never be modified from
+	 * user space at all.
+	 */
+	if (ibqp->state == IBV_QPS_RESET &&
+	    ibqp->context->device->node_type == IBV_NODE_CA) {
+		pthread_spin_unlock(&qhp->lock);
+		*bad_wr = wr;
+		return EINVAL;
+	}
+
+	/* in error but not yet flushed: flush first, see iw_post_rc_send() */
+	if (!qhp->wq.flushed && t4_wq_in_error(&qhp->wq)) {
+		pthread_spin_unlock(&qhp->lock);
+		/* bug 302 field debugging: once per QP per error, flush clears it */
+		syslog(LOG_NOTICE, "libcxgb4: bug302 qp %u post in error before "
+		       "flush, flushing\n", qhp->wq.sq.qid);
+		chrd_flush_qp(qhp);
+		pthread_spin_lock(&qhp->lock);
+	}
 
 	/*
 	 * If the qp has been flushed, then just insert a special
@@ -2218,13 +2284,13 @@ void chrd_flush_qp(struct chrd_qp *qhp)
 		prot = CHRD_TRANSPORT_ROCEV2;
 	else
 		prot = CHRD_TRANSPORT_IWARP;
-	chrd_flush_hw_cq(rchp);
+	chrd_flush_hw_cq(rchp, qhp);
 	chrd_count_rcqes(&rchp->cq, &qhp->wq, &count, prot);
 	if (!qhp->srq)
 		chrd_flush_rq(qhp, &rchp->cq, count);
 
 	if (schp != rchp)
-		chrd_flush_hw_cq(schp);
+		chrd_flush_hw_cq(schp, qhp);
 	chrd_flush_sq(qhp);
 	if (qhp->srq)
 		pthread_spin_unlock(&qhp->srq->lock);

@@ -233,12 +233,92 @@ static void advance_oldest_read(struct t4_wq *wq)
 	wq->sq.oldest_read = NULL;
 }
 
+/* does this CQE belong to qhp, for the purposes of chrd_cq_clean()? */
+static int cqe_of_qp(struct chrd_cq *chp, struct chrd_qp *qhp, struct t4_cqe *cqe)
+{
+	if (CQE_QPTYPE(cqe) == RAW)
+		return 0;
+	if (get_qhp(chp->rhp, CQE_QPID(cqe)) != qhp)
+		return 0;
+	/* receives on an SRQ account for SRQ buffers, not for the QP */
+	return SQ_TYPE(cqe) || !qhp->srq;
+}
+
+/*
+ * Remove every completion that belongs to qhp from chp: those waiting in the
+ * software queue and those in the hardware queue that nobody has polled yet.
+ * A transition to RESET discards the QP's outstanding work, and nothing may be
+ * left in the CQ to be matched later against the QP's reset indices.
+ *
+ * Other QPs' completions keep their order.  Called with chp->lock held.
+ */
+void chrd_cq_clean(struct chrd_cq *chp, struct chrd_qp *qhp)
+{
+	struct t4_cq *cq = &chp->cq;
+	const __be64 genbit = htobe64((u64)1 << S_CQE_GENBIT);
+	u16 idx, dst, n, i, nfreed;
+	u8 gen;
+
+	/* software queue: compact in place, oldest first */
+	idx = dst = cq->sw_cidx;
+	n = cq->sw_in_use;
+	for (i = 0; i < n; i++) {
+		if (!cqe_of_qp(chp, qhp, &cq->sw_queue[idx])) {
+			if (dst != idx)
+				cq->sw_queue[dst] = cq->sw_queue[idx];
+			if (++dst == cq->size)
+				dst = 0;
+		} else {
+			cq->sw_in_use--;
+		}
+		if (++idx == cq->size)
+			idx = 0;
+	}
+	cq->sw_pidx = dst;
+
+	/* hardware queue: count the entries written but not yet polled... */
+	n = 0;
+	idx = cq->cidx;
+	gen = cq->gen;
+	while (n < cq->size && CQE_GENBIT(&cq->queue[idx]) == gen) {
+		n++;
+		if (++idx == cq->size) {
+			idx = 0;
+			gen ^= 1;
+		}
+	}
+	udma_from_device_barrier();
+
+	/*
+	 * ...then, newest first, slide each entry we keep up past the ones we
+	 * drop.  A destination keeps its own generation bit, which is already
+	 * the valid one for that slot.  The slots left at the old end are
+	 * consumed, which also returns their credits to the hardware.
+	 */
+	nfreed = 0;
+	for (i = n; i-- > 0; ) {
+		struct t4_cqe *cqe = &cq->queue[(cq->cidx + i) % cq->size];
+
+		if (cqe_of_qp(chp, qhp, cqe)) {
+			nfreed++;
+		} else if (nfreed) {
+			struct t4_cqe *d = &cq->queue[(cq->cidx + i + nfreed) % cq->size];
+			__be64 dgen = d->bits_type_ts & genbit;
+
+			*d = *cqe;
+			d->bits_type_ts = (d->bits_type_ts & ~genbit) | dgen;
+		}
+	}
+	while (nfreed--)
+		t4_hwcq_consume(cq);
+}
+
 /*
  * Move all CQEs from the HWCQ into the SWCQ.
  * Deal with out-of-order and/or completions that complete
  * prior unsignalled WRs.
  */
-void chrd_flush_hw_cq(struct chrd_cq *chp)
+void chrd_flush_hw_cq(struct chrd_cq *chp, struct chrd_qp *flush_qhp)
 {
 	struct t4_cqe *hw_cqe, *swcqe, read_cqe;
 	struct chrd_qp *qhp;
@@ -269,6 +349,17 @@ void chrd_flush_hw_cq(struct chrd_cq *chp)
 		 * drop CQEs with no associated QP
 		 */
 		if (qhp == NULL)
+			goto next_cqe;
+
+		/*
+		 * A CQ is shared by many QPs.  Drop the HW CQEs of a QP other than
+		 * the one being flushed that was itself flushed earlier, as
+		 * poll_roce_cq() and poll_iw_cq() do and as the kernel's
+		 * chrd_flush_hw_cq() does.  Moving them would set
+		 * swsqe->complete, or queue a receive, on a QP whose work has
+		 * already been completed by the flush, and deliver it twice.
+		 */
+		if (qhp != flush_qhp && qhp->wq.flushed)
 			goto next_cqe;
 
 		if (prot) {
