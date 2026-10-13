@@ -1,0 +1,199 @@
+From 503c6f7c2b68358c76c7f519cc46fed2a0f53c9e Mon Sep 17 00:00:00 2001
+From: Potnuri Bharat Teja <bharat@chelsio.com>
+Date: Mon, 12 Oct 2026 20:25:06 -0400
+Subject: [PATCH 25/25] iw_cxgb4/rdma_cm: fix teardown hangs on adapter death
+ and PCI remove
+
+When the adapter stops responding (power loss, D3), flush every QP from a
+work item so pending GSI/CM sends complete and rdma_destroy_id() returns;
+also initialise rdev.blocker_list/blocker_lock in c4iw_alloc(). In rdma_cm,
+destroy an ID in DEVICE_REMOVAL instead of skipping it, so remove completes.
+---
+ drivers/infiniband/core/cma.c          | 11 +++++++--
+ drivers/infiniband/hw/cxgb4/cm.c       | 26 +++++++++++++++++++-
+ drivers/infiniband/hw/cxgb4/device.c   |  8 ++++++-
+ drivers/infiniband/hw/cxgb4/iw_cxgb4.h |  6 ++++-
+ drivers/infiniband/hw/cxgb4/qp.c       | 33 ++++++++++++++++++++++++++
+ 5 files changed, 79 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/infiniband/core/cma.c b/drivers/infiniband/core/cma.c
+index 7afd998795b6..0a6a63be6852 100644
+--- a/drivers/infiniband/core/cma.c
++++ b/drivers/infiniband/core/cma.c
+@@ -2100,8 +2100,15 @@ static void destroy_id_handler_unlock(struct rdma_id_private *id_priv)
+ 	lockdep_assert_held(&id_priv->handler_mutex);
+ 	spin_lock_irqsave(&id_priv->lock, flags);
+ 	state = id_priv->state;
+-	if (READ_ONCE(id_priv->state) == RDMA_CM_DESTROYING ||
+-	    READ_ONCE(id_priv->state) == RDMA_CM_DEVICE_REMOVAL)
++	/*
++	 * Only a second destroy of the same ID is skipped.  An ID in
++	 * RDMA_CM_DEVICE_REMOVAL is one whose ULP got the DEVICE_REMOVAL
++	 * event, returned 0 and is now destroying it, as
++	 * cma_send_device_removal_put() expects: it must be destroyed here,
++	 * or its cma_device reference is never dropped and cma_remove_one()
++	 * waits for ever.
++	 */
++	if (state == RDMA_CM_DESTROYING)
+ 		goto out_unlock;
+ 	id_priv->state = RDMA_CM_DESTROYING;
+ 	spin_unlock_irqrestore(&id_priv->lock, flags);
+diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
+index f9907fce0c45..e71b2b70d257 100644
+--- a/drivers/infiniband/hw/cxgb4/cm.c
++++ b/drivers/infiniband/hw/cxgb4/cm.c
+@@ -5004,10 +5004,30 @@ static void wake_all_blockers(struct c4iw_dev *dev)
+ 	mutex_unlock(&dev->rdev.blocker_lock);
+ }
+ 
++/*
++ * CM message sent on the GSI QP holds a reference on its cm_id until its send completion is
++ * reaped, and rdma_destroy_id() waits for that reference forever.
++ * Everything that was in flight on a QP when the device died can never
++ * complete: no CPL is processed any more and the firmware is not going to
++ * answer.
++ *
++ * flush mechanism takes the QP mutex, and the caller may be a modify_qp that already holds it.
++ */
++void c4iw_fatal_work(struct work_struct *work)
++{
++	struct c4iw_dev *dev = container_of(work, struct c4iw_dev, fatal_work);
++
++	/* Wake up anybody waiting for HW/FW messages */
++	wake_all_blockers(dev);
++
++	c4iw_flush_all_qps(dev);
++}
++
+ void c4iw_disable_device(struct c4iw_rdev *rdev, int recover)
+ {
++	bool first = !c4iw_fatal_error(rdev);
+ 
+-	if (!c4iw_fatal_error(rdev))
++	if (first)
+ 		dev_err(rdev->lldi.dev, "Disabling device due to fatal error\n");
+ 
+ 	rdev->flags |= T4_FATAL_ERROR;
+@@ -5033,6 +5053,10 @@ void c4iw_disable_device(struct c4iw_rdev *rdev, int recover)
+ 		/* Begin cleanup of all endpoints and queue pairs */
+ 		kill_all_eps(dev);
+ 	}
++
++	/* Complete what is outstanding on the QPs, once per device. */
++	if (first)
++		schedule_work(&rdev_to_c4iw_dev(rdev)->fatal_work);
+ }
+ 
+ int __init c4iw_cm_init(void)
+diff --git a/drivers/infiniband/hw/cxgb4/device.c b/drivers/infiniband/hw/cxgb4/device.c
+index 132a1bda4282..4da94f029d63 100644
+--- a/drivers/infiniband/hw/cxgb4/device.c
++++ b/drivers/infiniband/hw/cxgb4/device.c
+@@ -1037,6 +1037,8 @@ static void c4iw_rdev_close(struct c4iw_rdev *rdev)
+ 
+ void c4iw_dealloc(struct uld_ctx *ctx)
+ {
++	/* the fatal work uses the device; let it finish first */
++	cancel_work_sync(&ctx->dev->fatal_work);
+ 	if (!xa_empty(&ctx->dev->cqs))
+ 		pr_err("iw_cxgb4: CQs pending!!\n");
+ 	if (!xa_empty(&ctx->dev->qps))
+@@ -1163,7 +1165,11 @@ static struct c4iw_dev *c4iw_alloc(const struct cxgb4_lld_info *infop)
+ 	INIT_LIST_HEAD(&devp->db_fc_list);
+ 	INIT_LIST_HEAD(&devp->rdev.ep_glist);
+ 	mutex_init(&devp->rdev.ep_glist_lock);
++	/* walked by wake_all_blockers() when the device dies */
++	INIT_LIST_HEAD(&devp->rdev.blocker_list);
++	mutex_init(&devp->rdev.blocker_lock);
+ 	init_waitqueue_head(&devp->wait);
++	INIT_WORK(&devp->fatal_work, c4iw_fatal_work);
+ 	devp->avail_ird = devp->rdev.lldi.max_ird_adapter;
+ 
+ 	if (c4iw_debugfs_root) {
+@@ -1361,7 +1367,7 @@ static int c4iw_uld_state_change(void *handle, enum cxgb4_state new_state)
+ 	case CXGB4_STATE_START_RECOVERY:
+ 		pr_info("%s: Fatal Error\n", pci_name(ctx->lldi.pdev));
+ 		if (ctx->dev)
+-			ctx->dev->rdev.flags |= T4_FATAL_ERROR;
++			c4iw_disable_device(&ctx->dev->rdev, 0);
+ 		fallthrough;
+ 	case CXGB4_STATE_DETACH:
+ 		pr_info("%s: Detach\n", pci_name(ctx->lldi.pdev));
+diff --git a/drivers/infiniband/hw/cxgb4/iw_cxgb4.h b/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
+index 591f28ac6173..6fb29203a0c2 100644
+--- a/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
++++ b/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
+@@ -300,7 +300,7 @@ static inline int c4iw_wait_for_reply(struct c4iw_rdev *rdev,
+ 		dev_err(rdev->lldi.dev,
+ 			"%s - device not responding (disabling device) - tid %u qpid %u\n",
+ 			func, hwtid, qpid);
+-		rdev->flags |= T4_FATAL_ERROR;
++		c4iw_disable_device(rdev, 0);
+ 		wr_waitp->ret = -EIO;
+ 		goto out;
+ 	}
+@@ -359,6 +359,8 @@ struct c4iw_dev {
+ 	struct list_head db_fc_list;
+ 	u32 avail_ird;
+ 	wait_queue_head_t wait;
++	/* flushes every QP once the device is declared dead */
++	struct work_struct fatal_work;
+ };
+ 
+ struct uld_ctx {
+@@ -1374,6 +1376,8 @@ int c4iw_iw_accept_cr(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_para
+ int c4iw_iw_reject_cr(struct iw_cm_id *cm_id, const void *pdata, u8 pdata_len);
+ void c4iw_iw_qp_add_ref(struct ib_qp *qp);
+ void c4iw_iw_qp_rem_ref(struct ib_qp *qp);
++void c4iw_flush_all_qps(struct c4iw_dev *dev);
++void c4iw_fatal_work(struct work_struct *work);
+ struct ib_mr *c4iw_alloc_mr(struct ib_pd *pd, enum ib_mr_type mr_type,
+                             u32 max_num_sg);
+ int c4iw_map_mr_sg(struct ib_mr *ibmr, struct scatterlist *sg, int sg_nents,
+diff --git a/drivers/infiniband/hw/cxgb4/qp.c b/drivers/infiniband/hw/cxgb4/qp.c
+index cecf4314de45..ef4b54314541 100644
+--- a/drivers/infiniband/hw/cxgb4/qp.c
++++ b/drivers/infiniband/hw/cxgb4/qp.c
+@@ -3628,6 +3628,39 @@ static void flush_qp(struct c4iw_qp *qhp)
+ 	__flush_qp(qhp, rchp, schp);
+ }
+ 
++/*
++ * Flush every QP of a device that has died.  Kernel QPs get their pending
++ * WRs completed with a flush status, so e.g. the ib_mad send completions of
++ * the CM messages are delivered and the cm_ids that wait for them can be
++ * destroyed; user QPs are marked in error and their CQs are kicked, the
++ * library then flushes them itself.  Nothing is sent to the device.
++ */
++void c4iw_flush_all_qps(struct c4iw_dev *dev)
++{
++	struct c4iw_qp *qhp;
++	unsigned long index;
++
++	xa_lock_irq(&dev->qps);
++	xa_for_each(&dev->qps, index, qhp) {
++		if (!refcount_inc_not_zero(&qhp->qp_refcnt))
++			continue;
++		xa_unlock_irq(&dev->qps);
++
++		if (qhp->ibqp.uobject) {
++			/* wq.flushed of a user QP is protected by qhp->mutex */
++			mutex_lock(&qhp->mutex);
++			flush_qp(qhp);
++			mutex_unlock(&qhp->mutex);
++		} else {
++			flush_qp(qhp);
++		}
++		c4iw_iw_qp_rem_ref(&qhp->ibqp);
++
++		xa_lock_irq(&dev->qps);
++	}
++	xa_unlock_irq(&dev->qps);
++}
++
+ static int rdma_fini(struct c4iw_dev *rhp, struct c4iw_qp *qhp,
+ 		     struct c4iw_ep *ep)
+ {
+-- 
+2.39.1
+
